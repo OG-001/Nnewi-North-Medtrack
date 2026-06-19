@@ -1,0 +1,34 @@
+# Dev / self-host stack. The PWA is fully usable on its own (offline-first);
+# postgres + redis are included ready for the NestJS sync hub (apps/api, Phase 3).
+# Run from the repo root:  docker compose -f infra/docker-compose.yml up --build
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.web
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: phc
+      POSTGRES_PASSWORD: phc_dev_only
+      POSTGRES_DB: phc_track
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # api:   # apps/api (NestJS) — Phase 3. Add when the sync hub is built.
+
+volumes:
+  pgdata:

@@ -1,0 +1,17 @@
+{
+  "name": "phc-track",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Nnewi North PHC Digital Health Platform (codename PHC-Track) — offline-first PWA",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @phc/web dev",
+    "build": "pnpm --filter @phc/web build",
+    "preview": "pnpm --filter @phc/web preview",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm --filter @phc/web lint"
+  }
+}

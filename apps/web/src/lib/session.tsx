@@ -1,6 +1,8 @@
 /**
- * Session/auth context. Demo local auth (username + PIN) against the seeded
- * users table — real authn/z is the NestJS backend (Phase 1). Offline-aware:
+ * Session/auth context. Local auth (username + PIN) against the on-device users
+ * table gets staff into the app with no network at all; when a sync hub is
+ * reachable a hub session is established alongside it (see hub-session.ts), and
+ * that is what authorises sync. Offline-aware:
  * the chosen facility + user persist in localStorage so a previously-used device
  * can re-open while offline (user-roles §5).
  *
@@ -8,7 +10,7 @@
  * BEFORE the sign-in screen. Login is then scoped to that facility — a staff
  * member can only authenticate against an account provisioned for the selected
  * facility (oversight roles excepted). This is the first line of cross-facility
- * isolation; data-scope filtering (lib/scope.ts) and the future server-side sync
+ * isolation; data-scope filtering (lib/scope.ts) and the hub's server-side sync
  * scope are the others.
  */
 import {
@@ -26,6 +28,7 @@ import type { Actor } from "../db/repository";
 import type { UserAccount } from "../db/types";
 import { newId } from "@phc/shared";
 import { getDeviceId } from "./device";
+import { endHubSession, establishHubSession } from "./hub-session";
 
 interface SessionValue {
   user: UserAccount | null;
@@ -114,6 +117,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         at: new Date().toISOString(),
         device_id: getDeviceId(),
       });
+
+      // Best-effort: pick up a hub session so this device can sync. Deliberately
+      // not awaited — sign-in must not wait on the network (offline-sync §1).
+      void establishHubSession(uname, pin, selectedFacilityId);
+
       return { ok: true };
     },
     [selectedFacilityId],
@@ -123,6 +131,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setFacilityId(null);
     localStorage.removeItem(LS_USER);
+    void endHubSession();
     // selectedFacilityId is kept so logout returns to the same facility's sign-in.
   }, []);
 

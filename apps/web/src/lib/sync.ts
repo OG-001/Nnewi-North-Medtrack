@@ -2,14 +2,18 @@
  * Sync-status store — implements the UI-visible state machine from
  * offline-sync-design §4 (Offline / Pending(n) / Syncing / Synced / Conflict).
  *
- * The real pull/push protocol against the NestJS hub is Phase 3. Here we run the
- * local side faithfully: writes land in the outbox; "Sync now" drains pending
- * entries (push→ack) and stamps last-synced. When a hub exists, replace
- * `drainOutbox` with the §3 POST /sync/push + GET /sync/changes calls.
+ * Writes land in the outbox; a cycle pushes them to the hub and pulls back what
+ * other devices recorded (see sync-engine.ts for the protocol itself).
+ *
+ * When no hub is configured or reachable, the app stays fully usable and the
+ * outbox simply keeps accumulating — the network is never on the critical path
+ * for care (§1). Pending work drains on the next successful cycle.
  */
 import { useSyncExternalStore } from "react";
 import type { SyncState } from "@phc/shared";
 import { db } from "../db/db";
+import { hasHubSession, hubReachable } from "./api";
+import { runSyncCycle } from "./sync-engine";
 
 interface SyncSnapshot {
   state: SyncState;
@@ -64,35 +68,51 @@ export function bumpPending() {
 
 let syncing = false;
 
-/** Drain the outbox (simulated push→ack). Replace with hub calls in Phase 3. */
+/** Set when the last cycle failed, so the UI can explain why work is pending. */
+let lastError: string | null = null;
+
+export function getSyncError(): string | null {
+  return lastError;
+}
+
+/**
+ * Push local work to the hub, then pull what changed elsewhere.
+ *
+ * A missing or unreachable hub is not an error state for the clinic: the app
+ * keeps working offline-first and the outbox drains later.
+ */
 export async function syncNow(): Promise<void> {
   if (syncing || !snapshot.online) return;
   syncing = true;
   snapshot.state = "syncing";
   emit();
   try {
-    const pending = await db.outbox
-      .where("status")
-      .anyOf("pending", "in_flight")
-      .toArray();
-    // Simulate network latency proportional to batch size (capped).
-    await new Promise((r) => setTimeout(r, Math.min(600, 120 + pending.length * 20)));
-    await db.transaction("rw", db.outbox, async () => {
-      for (const e of pending) {
-        if (e.localSeq != null) {
-          await db.outbox.update(e.localSeq, { status: "acked" });
-        }
-      }
-    });
+    if (!hasHubSession() || !(await hubReachable())) {
+      // No hub yet (or it is down) — keep the pending count honest and wait.
+      lastError = hasHubSession() ? "Sync hub unreachable" : null;
+      return;
+    }
+    const result = await runSyncCycle();
+    lastError = result.rejected > 0 ? `${result.rejected} change(s) rejected by the hub` : null;
     const stamp = new Date().toISOString();
     snapshot.lastSyncAt = stamp;
     localStorage.setItem("phc-track.last_sync_at", stamp);
+  } catch (err) {
+    lastError = err instanceof Error ? err.message : "Sync failed";
   } finally {
     syncing = false;
     await refreshCounts();
   }
 }
 
+/** How often to try a cycle while the app is open and online. */
+const PERIODIC_SYNC_MS = 5 * 60_000;
+
+/**
+ * Triggers from offline-sync-design §3.3: reconnect, app focus, a periodic
+ * timer while online, explicit "Sync now", and the service worker's Background
+ * Sync where the browser supports it.
+ */
 if (typeof window !== "undefined") {
   window.addEventListener("online", () => {
     snapshot.online = true;
@@ -105,8 +125,37 @@ if (typeof window !== "undefined") {
     deriveState();
     emit();
   });
+
+  // Returning to the tab is the moment a nurse is most likely to have moved
+  // back into coverage.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") void syncNow();
+  });
+  window.addEventListener("focus", () => void syncNow());
+
+  setInterval(() => {
+    if (snapshot.online && snapshot.pending > 0) void syncNow();
+  }, PERIODIC_SYNC_MS);
+
+  // Background Sync lets the browser retry after the tab is closed. Not
+  // supported everywhere (notably iOS Safari), so it is strictly an addition to
+  // the triggers above, never a replacement.
+  void registerBackgroundSync();
+
   // Initial count once the DB is ready.
   void refreshCounts();
+}
+
+async function registerBackgroundSync() {
+  try {
+    if (!("serviceWorker" in navigator)) return;
+    const reg = (await navigator.serviceWorker.ready) as ServiceWorkerRegistration & {
+      sync?: { register: (tag: string) => Promise<void> };
+    };
+    await reg.sync?.register("phc-sync");
+  } catch {
+    // Unsupported or blocked — the in-page triggers still cover every case.
+  }
 }
 
 export function subscribeSync(cb: () => void): () => void {

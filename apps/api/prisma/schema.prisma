@@ -1,0 +1,186 @@
+// PHC-Track sync hub — Postgres schema.
+//
+// Scope note (deviation, recorded in the Phase 3 change log): the hub stores
+// synced clinical rows in `SyncedEntity` with the data-model §2 common columns
+// as real, indexed columns and the domain body as JSONB. Sync, scope, conflict
+// detection and audit all key off the real columns; the per-entity relational
+// projection that data-model.md §3 describes is a reporting concern and lands
+// with Phase 8. `ChangeLog` is exactly the §3.10 ledger.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Facilities are hub-authoritative config (offline-sync-design §5).
+model Facility {
+  id            String   @id
+  code          String   @unique
+  name          String
+  nationalCode  String?  @map("national_code")
+  type          String
+  ward          String?
+  town          String?
+  lga           String
+  state         String
+  contactPhone  String?  @map("contact_phone")
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  users    UserFacility[]
+  entities SyncedEntity[]
+
+  @@map("facility")
+}
+
+/// Usernames are unique *within a facility*, not globally: the same `nurse`
+/// account exists at each provisioned PHC (RUNNING.md demo logins), and login
+/// resolves the pair (username, facility).
+model User {
+  id           String    @id
+  username     String
+  fullName     String    @map("full_name")
+  phone        String?
+  /// argon2 hash — never the PIN itself (security-and-compliance §8).
+  pinHash      String    @map("pin_hash")
+  passwordHash String?   @map("password_hash")
+  roles        String[]
+  status       String    @default("active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  facilities    UserFacility[]
+  devices       Device[]
+  refreshTokens RefreshToken[]
+
+  @@index([username])
+  @@map("app_user")
+}
+
+/// A user's data scope. LGA / system_admin roles are cross-facility and carry
+/// no rows here (scope resolves to null = all).
+model UserFacility {
+  userId     String @map("user_id")
+  facilityId String @map("facility_id")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+
+  @@id([userId, facilityId])
+  @@map("user_facility")
+}
+
+/// Enrolled clinic device (offline-sync-design §7). De-enrolment revokes sync.
+model Device {
+  id           String    @id
+  userId       String    @map("user_id")
+  label        String?
+  lastSeenAt   DateTime? @map("last_seen_at")
+  lastPushSeq  BigInt    @default(0) @map("last_push_seq")
+  revokedAt    DateTime? @map("revoked_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device")
+}
+
+/// Rotating refresh tokens (api-design §2). Stored hashed.
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  deviceId  String?   @map("device_id")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_token")
+}
+
+/// The synced clinical row. `rev` is the conflict signal, never a device clock.
+model SyncedEntity {
+  entityType     String   @map("entity_type")
+  id             String
+  facilityId     String   @map("facility_id")
+  rev            Int      @default(1)
+  payload        Json
+  createdAt      DateTime @map("created_at")
+  updatedAt      DateTime @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+  originDeviceId String?  @map("origin_device_id")
+  /// Set when an identity-critical contradiction escalated (§5 Escalation).
+  needsReview    Boolean  @default(false) @map("needs_review")
+  serverSeq      BigInt   @map("server_seq")
+
+  facility Facility @relation(fields: [facilityId], references: [id])
+
+  @@id([entityType, id])
+  @@index([facilityId, entityType])
+  @@index([serverSeq])
+  @@map("synced_entity")
+}
+
+/// Server-side sync ledger (data-model §3.10). Clients pull by `server_seq`.
+model ChangeLog {
+  serverSeq      BigInt   @id @default(autoincrement()) @map("server_seq")
+  entityType     String   @map("entity_type")
+  entityId       String   @map("entity_id")
+  facilityId     String   @map("facility_id")
+  op             String
+  rev            Int
+  payload        Json?
+  at             DateTime @default(now())
+  originDeviceId String?  @map("origin_device_id")
+
+  @@index([serverSeq, facilityId])
+  @@index([entityType, entityId])
+  @@map("change_log")
+}
+
+/// Admin conflict queue — ambiguous cases are escalated here, never dropped.
+model ConflictQueue {
+  id            String    @id @default(uuid()) @db.Uuid
+  entityType    String    @map("entity_type")
+  entityId      String    @map("entity_id")
+  facilityId    String    @map("facility_id")
+  fields        String[]
+  serverPayload Json      @map("server_payload")
+  clientPayload Json      @map("client_payload")
+  deviceId      String?   @map("device_id")
+  status        String    @default("open")
+  resolvedBy    String?   @map("resolved_by")
+  resolvedAt    DateTime? @map("resolved_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([status, facilityId])
+  @@map("conflict_queue")
+}
+
+/// Immutable audit trail (security-and-compliance). Every conflict resolution,
+/// login and sync mutation writes one.
+model AuditEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorUserId String? @map("actor_user_id")
+  action     String
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id")
+  facilityId String?  @map("facility_id")
+  deviceId   String?  @map("device_id")
+  details    Json?
+  at         DateTime @default(now())
+
+  @@index([at])
+  @@index([entityType, entityId])
+  @@map("audit_event")
+}

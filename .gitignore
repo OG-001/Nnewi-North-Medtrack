@@ -10,3 +10,18 @@ coverage/
 .vite/
 *.log
 pnpm-debug.log*
+
+# Playwright output (test harness arrives in Phase 0)
+playwright-report/
+test-results/
+
+# Session-local agent runtime state, never committed.
+# See .claude/rules/concurrent-sessions.md. Everything else under .claude/ IS
+# version-controlled on purpose: the agent system travels with the repository.
+.claude/session-git-locks.json
+.claude/sessions/
+
+# Local demo credentials — never committed (governance: no secrets in the repo).
+credentials.md
+apps/api/dist/
+packages/shared/dist/

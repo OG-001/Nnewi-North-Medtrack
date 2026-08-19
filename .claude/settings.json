@@ -1,0 +1,240 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(./**)",
+      "Glob(**)",
+      "Grep(**)",
+      "WebFetch",
+      "WebSearch",
+      "Edit(./**)",
+      "Write(./**)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(sed:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(awk:*)",
+      "Bash(wc:*)",
+      "Bash(tree:*)",
+      "Bash(file:*)",
+      "Bash(diff:*)",
+      "Bash(jq:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git worktree list:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git fetch:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh search:*)",
+      "Bash(corepack enable:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm preview:*)",
+      "Bash(pnpm lint:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm audit:*)",
+      "Bash(pnpm outdated:*)",
+      "Bash(pnpm licenses:*)",
+      "Bash(pnpm why:*)",
+      "Bash(pnpm list:*)",
+      "Bash(pnpm -r:*)",
+      "Bash(pnpm --filter:*)",
+      "Bash(pnpm exec:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node:*)",
+      "Bash(tsc:*)",
+      "Bash(vitest:*)",
+      "Bash(eslint:*)",
+      "Bash(docker compose -f infra/docker-compose.yml ps:*)",
+      "Bash(docker compose -f infra/docker-compose.yml config:*)",
+      "Bash(docker compose -f infra/docker-compose.yml logs:*)",
+      "Bash(docker compose -f infra/docker-compose.yml up:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker exec:*)",
+      "Bash(curl:*)"
+    ],
+    "deny": [
+      "Read(./**/.env)",
+      "Edit(./**/.env)",
+      "Write(./**/.env)",
+      "Read(./**/.env.local)",
+      "Edit(./**/.env.local)",
+      "Write(./**/.env.local)",
+      "Read(./**/.env.production)",
+      "Edit(./**/.env.production)",
+      "Write(./**/.env.production)",
+      "Read(./**/.deploy-credentials)",
+      "Edit(./**/.deploy-credentials)",
+      "Write(./**/.deploy-credentials)",
+      "Edit(./**/node_modules/**)",
+      "Write(./**/node_modules/**)",
+      "Edit(./**/dist/**)",
+      "Write(./**/dist/**)",
+      "Edit(./**/dist-ssr/**)",
+      "Write(./**/dist-ssr/**)",
+      "Edit(./**/build/**)",
+      "Write(./**/build/**)",
+      "Edit(./**/coverage/**)",
+      "Write(./**/coverage/**)",
+      "Edit(./**/.vite/**)",
+      "Write(./**/.vite/**)",
+      "Edit(./**/playwright-report/**)",
+      "Write(./**/playwright-report/**)",
+      "Edit(./**/test-results/**)",
+      "Write(./**/test-results/**)",
+      "Edit(./**/legacy/**)",
+      "Write(./**/legacy/**)",
+      "Edit(./**/backup/**)",
+      "Write(./**/backup/**)",
+      "Edit(./**/backup-*/**)",
+      "Write(./**/backup-*/**)",
+      "Edit(./pnpm-lock.yaml)",
+      "Write(./pnpm-lock.yaml)",
+      "Edit(./**/package-lock.json)",
+      "Write(./**/package-lock.json)",
+      "Edit(./**/yarn.lock)",
+      "Write(./**/yarn.lock)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(npm:*)",
+      "Bash(yarn:*)",
+      "Bash(pnpm publish:*)",
+      "Bash(pnpm audit --fix:*)",
+      "Bash(docker compose down:*)",
+      "Bash(docker system prune:*)",
+      "Bash(docker volume rm:*)",
+      "Bash(docker push:*)",
+      "Bash(docker buildx bake:*)",
+      "Bash(helm:*)",
+      "Bash(terraform:*)",
+      "Bash(aws:*)",
+      "Bash(*deploy*)",
+      "Bash(*destroy*)",
+      "Bash(*init-letsencrypt*)",
+      "Bash(psql:*)",
+      "Bash(pg_dump:*)",
+      "Bash(pg_restore:*)"
+    ]
+  },
+  "outputStyle": "phc-track-conduct",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/safety-gate.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/append-tool-events.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/announce-subagent.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/announce-subagent.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/append-action-ledger.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/inject-mode.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/session-hook.sh register",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/inject-mode.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/append-user-correction.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/scripts/session-hook.sh heartbeat",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-opus-5[1m]"
+  },
+  "effortLevel": "xhigh",
+  "$comment": "PHC-Track (Nnewi North PHC Digital Health Platform) Claude Code settings. FULLY SELF-CONTAINED: every hook and script path resolves under this repository's own .claude/. Permissive on routine read, search, edit, and pnpm dev/test work so agents never stall for confirmation; the 'ask' gates are genuinely consequential operations.",
+  "$comment_deny": "'deny' overrides 'allow' and is never prompted. It hard-blocks: secrets (.env, .env.local, .env.production, .deploy-credentials), generated output (node_modules, dist, dist-ssr, build, coverage, .vite, playwright-report, test-results), legacy/ and backup/ paths, and the generated lockfiles. NOTE: infra/.env.example is deliberately NOT denied. It is the documented placeholder template that tells the owner which keys exist, and it must never carry a real value.",
+  "$comment_ask": "npm and yarn are gated because this is a pnpm workspace: running either produces a second lockfile and a broken node_modules. 'docker compose down' is gated because the '-v' form destroys the pgdata volume and every patient record in it. psql, pg_dump, and pg_restore are gated because they touch clinical data directly.",
+  "$comment_safety_gate": "safety-gate.sh re-enforces the same deny rules deterministically at PreToolUse as defense in depth, and adds two content-based protections a path glob cannot express: hard-coded credentials (Global Constraint 2) and hard deletes of clinical data (Global Constraint 3). Keep it aligned with the Global Constraints list in CLAUDE.md.",
+  "$comment_subagent_model": "env.CLAUDE_CODE_SUBAGENT_MODEL pins the default model for ALL spawned subagents from one control point. Remove the key to let subagents inherit the session model instead. Individual agents may override with a 'model:' frontmatter key, and high-value auditors may raise reasoning effort with an 'effort:' frontmatter key (low|medium|high|xhigh|max); 'max' exists only in frontmatter, the session-level effortLevel tops out at xhigh."
+}

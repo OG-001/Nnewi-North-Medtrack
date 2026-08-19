@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "outDir": "dist/cjs",
+    "rootDir": "src",
+    "declaration": true,
+    "noEmit": false,
+    "isolatedModules": false,
+    "verbatimModuleSyntax": false
+  },
+  "include": ["src/**/*.ts"]
+}

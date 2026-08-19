@@ -1,0 +1,30 @@
+# NestJS sync hub (apps/api). Built from the repo root:
+#   docker compose -f infra/docker-compose.yml up --build
+FROM node:20-alpine AS build
+WORKDIR /repo
+RUN corepack enable
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/api/package.json apps/api/
+RUN pnpm install --frozen-lockfile --filter @phc/api... --filter @phc/shared...
+
+COPY packages/shared packages/shared
+COPY apps/api apps/api
+RUN pnpm --filter @phc/shared build \
+ && pnpm --filter @phc/api exec prisma generate \
+ && pnpm --filter @phc/api build
+
+FROM node:20-alpine AS runtime
+WORKDIR /repo
+RUN corepack enable
+ENV NODE_ENV=production
+
+COPY --from=build /repo/node_modules node_modules
+COPY --from=build /repo/packages/shared packages/shared
+COPY --from=build /repo/apps/api apps/api
+COPY --from=build /repo/package.json pnpm-workspace.yaml ./
+
+EXPOSE 3000
+# Migrations are applied on start so a fresh volume comes up ready.
+CMD ["sh", "-c", "cd apps/api && npx prisma migrate deploy && node dist/src/main.js"]

@@ -1,5 +1,5 @@
 # Dev / self-host stack. The PWA is fully usable on its own (offline-first);
-# postgres + redis are included ready for the NestJS sync hub (apps/api, Phase 3).
+# the api service is the NestJS sync hub that reconciles devices (Phase 3).
 # Run from the repo root:  docker compose -f infra/docker-compose.yml up --build
 services:
   web:
@@ -28,7 +28,24 @@ services:
       - "6379:6379"
     restart: unless-stopped
 
-  # api:   # apps/api (NestJS) — Phase 3. Add when the sync hub is built.
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql://phc:phc_dev_only@postgres:5432/phc_track?schema=public
+      # Override in a real deployment — never ship this value (NDPA, no secrets in images).
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-min-32-chars-long}
+      ACCESS_TOKEN_TTL: 15m
+      REFRESH_TOKEN_TTL_DAYS: 30
+      CORS_ORIGINS: http://localhost:8080,http://localhost:5173
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
 
 volumes:
   pgdata:

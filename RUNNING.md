@@ -82,10 +82,10 @@ Each PHC's data is kept separate in three layers:
 |---|---|---|
 | **Scoped authentication** | Clinical staff accounts are provisioned for a single facility (`facility_ids`). The login step only accepts accounts whose `facility_ids` includes the selected PHC — a nurse at facility A cannot sign in at facility B. | **Enforced now** |
 | **Client-side data-scope** | Every database read in the app is filtered by the signed-in `facility_id`. Deleted/foreign rows are never returned to the UI. LGA and System Admin roles are the deliberate cross-facility exception for oversight. | **Enforced now** |
-| **Server-side sync scope** | The NestJS sync hub (Phase 3) will only ship a facility's rows to that facility's device. Even a tampered client cannot request another facility's data. | **Deferred — Phase 3** |
+| **Server-side sync scope** | The NestJS sync hub ships a facility's rows only to that facility's device: a pull naming an out-of-scope facility returns `OUT_OF_SCOPE`, and a push carrying a foreign `facility_id` is rejected. A tampered client cannot request another facility's data. | **Enforced now** (hub) |
 
-The first two layers are active in the current offline PWA. The third is the
-production guarantee and will be added when the sync hub is built.
+All three layers are implemented. The first two are active in the offline PWA on
+its own; the third applies whenever the app is pointed at a running sync hub.
 
 ---
 
@@ -107,11 +107,14 @@ registration + EMR, maternal/ANC, immunization, queue, NHMIS reporting +
 DHIS2/CSV export, admin (facilities/staff/audit/health), RBAC, offline
 persistence with outbox + audit, installable PWA, dark-green theme.
 
-**Deferred (server-side, per the plan):** the NestJS + PostgreSQL **sync hub**
-(Phases 1 server / 3), server-side scope enforcement, live **SMS** dispatch
-(Phase 7), and production hardening (Phase 10). The app is structured so these
-drop in behind existing seams — see the change-log under
-[`devops/change_log/`](devops/change_log/).
+**Implemented (backend):** the NestJS + PostgreSQL **sync hub** (`apps/api`) —
+facility-scoped auth, the push/pull change-log protocol, conflict resolution with
+an admin escalation queue, and server-side scope enforcement.
+
+**Deferred (per the plan):** live **SMS** dispatch (Phase 7), the relational
+reporting projection (Phase 8), and production hardening (Phase 10). See the
+change-log under [`devops/change_log/`](devops/change_log/) — the Phase 3 entry
+records what is still open before that phase's exit gate can be signed off.
 
 ---
 
@@ -119,9 +122,50 @@ drop in behind existing seams — see the change-log under
 
 ```
 apps/web/         offline-first PWA (React + TS + Vite + Tailwind + Dexie)
+apps/api/         NestJS sync hub (Prisma + PostgreSQL): auth, sync, conflicts
 packages/shared/  domain logic shared with the future API (enums, RBAC, MRN,
                   EDD, EPI + ANC schedule engines, app config, facility registry)
 infra/            Docker / compose / env example for self-hosting
 devops/           per-phase change log
 docs/             the build blueprint (read this for the full plan)
 ```
+
+---
+
+## Running the sync hub (optional)
+
+The PWA works without it. Start the hub when you want devices to reconcile with
+each other.
+
+```bash
+docker compose -f infra/docker-compose.yml up -d postgres   # or your own Postgres
+cp apps/api/.env.example apps/api/.env                      # then set JWT_SECRET
+pnpm db:migrate                                             # create the schema
+pnpm db:seed                                                # facilities + demo staff
+pnpm dev:api                                                # hub on :3000/api/v1
+```
+
+Point the PWA at it with `VITE_API_BASE_URL` (defaults to
+`http://localhost:3000/api/v1`), or run the whole stack with
+`docker compose -f infra/docker-compose.yml up --build`.
+
+> **Port note:** `3000` is a common default and may already be taken on your
+> machine. Set `PORT` for the hub and `VITE_API_BASE_URL` for the PWA to match.
+
+### Tests
+
+```bash
+pnpm test                          # unit + live-hub tests (34: 27 api, 7 web)
+pnpm e2e                           # offline browser tests (7) — builds + previews the PWA
+pnpm test:all                      # both of the above
+bash apps/api/test/e2e-sync.sh     # protocol tests against a running hub (18)
+```
+
+`pnpm test` runs with or without infrastructure: the live-hub tests (resumable
+pull, replay, poison isolation, baseline volume/perf) skip themselves when no
+hub answers, and the 21 conflict-resolution tests plus 7 client durability tests
+always run.
+
+The browser tests run against the **production build**, not the dev server: the
+offline guarantee comes from the PWA service worker, which only exists after
+`vite build`. The first run takes a minute or so because it builds.

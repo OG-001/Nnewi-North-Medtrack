@@ -41,7 +41,12 @@ export function createRecord<T extends BaseRecord>(
   } as T;
 }
 
-const ENTITY_TYPE_BY_TABLE: Record<string, string> = {
+/**
+ * Dexie table name to the wire `entity_type` written into the outbox. This is
+ * the authority for entity naming on the wire; the shared sync protocol and the
+ * hub must agree with it. Exported so that contract can be asserted in a test.
+ */
+export const ENTITY_TYPE_BY_TABLE: Record<string, string> = {
   facilities: "facility",
   users: "user_account",
   patients: "patient",

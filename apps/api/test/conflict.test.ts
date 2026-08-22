@@ -14,7 +14,7 @@ const server = (payload: Record<string, unknown>, rev: number, deletedAt: Date |
 describe("append-only clinical events (§5 row 1)", () => {
   it("never overwrites a recorded event when a concurrent change exists", () => {
     const res = resolveChange({
-      entityType: "encounters",
+      entityType: "encounter",
       op: "upsert",
       server: server({ facility_id: "fac-0062", notes: "recorded at hub" }, 3),
       clientPayload: { facility_id: "fac-0062", notes: "stale device copy" },
@@ -26,7 +26,7 @@ describe("append-only clinical events (§5 row 1)", () => {
 
   it("applies a genuinely new event (own UUID) with no conflict — §6 example 1", () => {
     const res = resolveChange({
-      entityType: "immunizationDoses",
+      entityType: "immunization_dose",
       op: "upsert",
       server: null,
       clientPayload: { facility_id: "fac-0062", antigen: "bcg", status: "given" },
@@ -39,20 +39,20 @@ describe("append-only clinical events (§5 row 1)", () => {
 
 describe("workflow state-priority merge (§5 row 3)", () => {
   it("advances forward: completed beats in_progress — §6 example 2", () => {
-    expect(mergeState("queueEntries", "in_progress", "completed")).toBe("completed");
+    expect(mergeState("queue_entry", "in_progress", "completed")).toBe("completed");
   });
 
   it("does not bounce back: waiting loses to in_progress", () => {
-    expect(mergeState("queueEntries", "in_progress", "waiting")).toBe("in_progress");
+    expect(mergeState("queue_entry", "in_progress", "waiting")).toBe("in_progress");
   });
 
   it("given beats due for an immunization dose", () => {
-    expect(mergeState("immunizationDoses", "due", "given")).toBe("given");
+    expect(mergeState("immunization_dose", "due", "given")).toBe("given");
   });
 
   it("resolves a concurrent queue race to the more advanced state", () => {
     const res = resolveChange({
-      entityType: "queueEntries",
+      entityType: "queue_entry",
       op: "upsert",
       server: server({ facility_id: "fac-0062", status: "completed" }, 4),
       clientPayload: { facility_id: "fac-0062", status: "in_progress" },
@@ -69,7 +69,7 @@ describe("demographics field-level LWW (§5 row 2)", () => {
 
   it("takes the field the client actually changed — §6 example 3", () => {
     const res = mergeDemographics(
-      "patients",
+      "patient",
       { ...base, phone_primary: "+2348031111111" }, // server changed nothing else
       { ...base, phone_primary: "+2348032222222" },
       base,
@@ -80,7 +80,7 @@ describe("demographics field-level LWW (§5 row 2)", () => {
 
   it("merges non-overlapping edits instead of clobbering", () => {
     const res = mergeDemographics(
-      "patients",
+      "patient",
       { ...base, phone_primary: "+2348039999999" }, // server edited phone
       { ...base, address_town: "Uruagu" }, // client edited town
       base,
@@ -94,7 +94,7 @@ describe("demographics field-level LWW (§5 row 2)", () => {
 
   it("keeps the server value for a field the client never touched", () => {
     const res = mergeDemographics(
-      "patients",
+      "patient",
       { ...base, address_town: "Nnewichi" },
       { ...base }, // client still holds the old town
       base,
@@ -108,7 +108,7 @@ describe("identity-critical escalation (§5 Escalation, §6 example 4)", () => {
 
   it("escalates two different DOBs rather than silently picking one", () => {
     const res = mergeDemographics(
-      "patients",
+      "patient",
       { ...base, date_of_birth: "1990-05-05" },
       { ...base, date_of_birth: "1991-07-07" },
       base,
@@ -123,7 +123,7 @@ describe("identity-critical escalation (§5 Escalation, §6 example 4)", () => {
 
   it("does not escalate when only one side changed the identity field", () => {
     const res = mergeDemographics(
-      "patients",
+      "patient",
       { ...base }, // server untouched
       { ...base, date_of_birth: "1991-07-07" },
       base,
@@ -133,7 +133,7 @@ describe("identity-critical escalation (§5 Escalation, §6 example 4)", () => {
 
   it("escalates a contradictory sex correction", () => {
     const b = { facility_id: "fac-0062", sex: "female" };
-    const res = mergeDemographics("patients", { ...b, sex: "male" }, { ...b, sex: "other" }, b);
+    const res = mergeDemographics("patient", { ...b, sex: "male" }, { ...b, sex: "other" }, b);
     expect(res.kind).toBe("escalate");
   });
 });
@@ -142,7 +142,7 @@ describe("idempotency (§6 example 5)", () => {
   it("treats a replayed push as a no-op — no duplicate, no rev bump", () => {
     const payload = { facility_id: "fac-0062", first_name: "Obinna" };
     const res = resolveChange({
-      entityType: "patients",
+      entityType: "patient",
       op: "upsert",
       server: server(payload, 2),
       clientPayload: payload,
@@ -154,7 +154,7 @@ describe("idempotency (§6 example 5)", () => {
 
   it("fast-forwards cleanly when the hub has seen no concurrent change", () => {
     const res = resolveChange({
-      entityType: "patients",
+      entityType: "patient",
       op: "upsert",
       server: server({ facility_id: "fac-0062", first_name: "Obinna" }, 2),
       clientPayload: { facility_id: "fac-0062", first_name: "Obinna Jr" },
@@ -168,7 +168,7 @@ describe("idempotency (§6 example 5)", () => {
 describe("hub-mediated deletes and config (§5 rows 4-5)", () => {
   it("lets a hub soft-delete win over a concurrent local edit", () => {
     const res = resolveChange({
-      entityType: "patients",
+      entityType: "patient",
       op: "upsert",
       server: server({ facility_id: "fac-0062" }, 5, new Date()),
       clientPayload: { facility_id: "fac-0062", first_name: "Edited offline" },
@@ -180,7 +180,7 @@ describe("hub-mediated deletes and config (§5 rows 4-5)", () => {
 
   it("applies an explicit delete deterministically", () => {
     const res = resolveChange({
-      entityType: "patients",
+      entityType: "patient",
       op: "delete",
       server: server({ facility_id: "fac-0062" }, 2),
       clientPayload: { facility_id: "fac-0062" },
@@ -192,7 +192,7 @@ describe("hub-mediated deletes and config (§5 rows 4-5)", () => {
 
   it("rejects a client push to hub-authoritative config", () => {
     const res = resolveChange({
-      entityType: "facilities",
+      entityType: "facility",
       op: "upsert",
       server: null,
       clientPayload: { facility_id: "fac-0062", name: "Renamed by device" },
@@ -221,7 +221,7 @@ describe("replay after a dropped response (regression)", () => {
     // arrived, so the device re-sends with base_rev 0 exactly as before.
     const clientPayload = { facility_id: "fac-0062", first_name: "Obinna" };
     const res = resolveChange({
-      entityType: "patients",
+      entityType: "patient",
       op: "upsert",
       server: server({ ...clientPayload, rev: 1 }, 1),
       clientPayload,
@@ -238,7 +238,7 @@ describe("JSONB key-order independence (regression)", () => {
     // be recognised as a no-op rather than bumping the rev on every retry.
     const clientPayload = { facility_id: "fac-0062", first_name: "Obinna" };
     const res = resolveChange({
-      entityType: "patients",
+      entityType: "patient",
       op: "upsert",
       server: server({ rev: 1, first_name: "Obinna", facility_id: "fac-0062" }, 1),
       clientPayload,
@@ -250,7 +250,7 @@ describe("JSONB key-order independence (regression)", () => {
 
   it("still detects a real change when keys are reordered", () => {
     const res = resolveChange({
-      entityType: "patients",
+      entityType: "patient",
       op: "upsert",
       server: server({ rev: 1, first_name: "Obinna", facility_id: "fac-0062" }, 1),
       clientPayload: { facility_id: "fac-0062", first_name: "Obinna Jr" },

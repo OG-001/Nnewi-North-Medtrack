@@ -92,7 +92,7 @@ async function drainFrom(since: number, pageSize: number): Promise<ChangeRow[]> 
 
 function patientChange(id: string, firstName: string) {
   return {
-    entity_type: "patients",
+    entity_type: "patient",
     entity_id: id,
     op: "upsert" as const,
     rev: 1,

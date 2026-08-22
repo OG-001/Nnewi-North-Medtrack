@@ -25,32 +25,32 @@ import { resolveChange, type Payload } from "./conflict";
  * device on first login.
  */
 const BASELINE_WINDOW_DAYS: Record<string, number | null> = {
-  patients: null, // the roster itself is what makes the device useful offline
-  patientLinks: null,
-  pregnancies: null, // active pregnancies are few and needed in full
-  ancScheduleItems: 400, // roughly one pregnancy's worth of schedule
-  queueEntries: 7,
-  encounters: 365,
-  referrals: 365,
-  ancVisits: 400,
-  deliveries: 400,
-  immunizationDoses: 730, // the EPI schedule runs to ~15 months plus catch-up
+  patient: null, // the roster itself is what makes the device useful offline
+  patient_link: null,
+  pregnancy: null, // active pregnancies are few and needed in full
+  anc_schedule_item: 400, // roughly one pregnancy's worth of schedule
+  queue_entry: 7,
+  encounter: 365,
+  referral: 365,
+  anc_visit: 400,
+  delivery: 400,
+  immunization_dose: 730, // the EPI schedule runs to ~15 months plus catch-up
 };
 
 export const DEFAULT_BASELINE_WINDOW_DAYS = 365;
 
 /** Entity types a device holds locally; drives the baseline snapshot. */
 const BASELINE_TYPES = [
-  "patients",
-  "patientLinks",
-  "encounters",
-  "referrals",
-  "pregnancies",
-  "ancScheduleItems",
-  "ancVisits",
-  "deliveries",
-  "immunizationDoses",
-  "queueEntries",
+  "patient",
+  "patient_link",
+  "encounter",
+  "referral",
+  "pregnancy",
+  "anc_schedule_item",
+  "anc_visit",
+  "delivery",
+  "immunization_dose",
+  "queue_entry",
 ];
 
 @Injectable()

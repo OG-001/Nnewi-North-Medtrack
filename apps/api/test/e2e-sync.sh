@@ -37,9 +37,18 @@ SCOPE=$(echo "$ENR" | python3 -c 'import sys,json;print(",".join(json.load(sys.s
 chk "device scope is its own facility only" "$SCOPE" "fac-0062"
 
 echo "== 4. Push a patient, then replay it (idempotency) =="
-PID="11111111-1111-4111-8111-111111111111"
+# Fresh ids per run: re-pushing the same id is (correctly) a no-op, so fixed
+# ids would make every count-delta assertion fail on the second run.
+RUN=$(python3 -c 'import uuid; print(uuid.uuid4().hex[:12])')
+PID="${RUN}-0000-4000-8000-000000000001"
 push(){ curl -s -X POST $API/sync/push -H "authorization: Bearer $1" -H 'content-type: application/json' -d "$2"; }
-BODY='{"device_id":"dev-A","changes":[{"entity_type":"patients","entity_id":"'$PID'","op":"upsert","rev":1,"base_rev":0,"payload":{"facility_id":"fac-0062","first_name":"Obinna","last_name":"Eze","date_of_birth":"1990-01-01","sex":"male","phone_primary":"+2348030000000"},"client_ts":"2026-08-19T10:00:00Z"}]}'
+
+# The hub keeps a long-lived ledger shared with the vitest suite, and a page is
+# capped, so totals are meaningless here. An empty push returns the current head
+# watermark; everything below is then asserted against changes after that point.
+HEAD0=$(push "$NURSE_A" '{"device_id":"dev-A","changes":[]}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["server_seq"])')
+
+BODY='{"device_id":"dev-A","changes":[{"entity_type":"patient","entity_id":"'$PID'","op":"upsert","rev":1,"base_rev":0,"payload":{"facility_id":"fac-0062","first_name":"Obinna","last_name":"Eze","date_of_birth":"1990-01-01","sex":"male","phone_primary":"+2348030000000"},"client_ts":"2026-08-19T10:00:00Z"}]}'
 R1=$(push "$NURSE_A" "$BODY")
 chk "first push applied" "$(echo "$R1" | python3 -c 'import sys,json;print(json.load(sys.stdin)["results"][0]["status"])')" "applied"
 REV1=$(echo "$R1" | python3 -c 'import sys,json;print(json.load(sys.stdin)["results"][0]["server_rev"])')
@@ -48,49 +57,50 @@ REV2=$(echo "$R2" | python3 -c 'import sys,json;print(json.load(sys.stdin)["resu
 chk "replayed push does not bump rev (idempotent)" "$REV2" "$REV1"
 
 echo "== 5. Cross-facility isolation (the Phase 3 guarantee) =="
-BAD='{"device_id":"dev-A","changes":[{"entity_type":"patients","entity_id":"22222222-2222-4222-8222-222222222222","op":"upsert","rev":1,"base_rev":0,"payload":{"facility_id":"fac-0060","first_name":"Foreign"},"client_ts":"2026-08-19T10:00:00Z"}]}'
+BAD='{"device_id":"dev-A","changes":[{"entity_type":"patient","entity_id":"'"${RUN}"-0000-4000-8000-000000000002'","op":"upsert","rev":1,"base_rev":0,"payload":{"facility_id":"fac-0060","first_name":"Foreign"},"client_ts":"2026-08-19T10:00:00Z"}]}'
 ST=$(push "$NURSE_A" "$BAD" | python3 -c 'import sys,json;print(json.load(sys.stdin)["results"][0]["status"])')
 chk "device cannot write to another facility" "$ST" "rejected"
 CODE=$(curl -s "$API/sync/changes?since=0&scope=fac-0060" -H "authorization: Bearer $NURSE_A" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("error",{}).get("code","NONE"))')
 chk "device cannot widen its pull scope" "$CODE" "OUT_OF_SCOPE"
 
 echo "== 6. Pull sees own facility's change =="
-N=$(curl -s "$API/sync/changes?since=0" -H "authorization: Bearer $NURSE_A" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["changes"]))')
+N=$(curl -s "$API/sync/changes?since=$HEAD0&limit=500" -H "authorization: Bearer $NURSE_A" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["changes"]))')
 chk "facility A pulls its own change" "$N" "1"
-N=$(curl -s "$API/sync/changes?since=0" -H "authorization: Bearer $NURSE_B" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["changes"]))')
+N=$(curl -s "$API/sync/changes?since=$HEAD0&limit=500" -H "authorization: Bearer $NURSE_B" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["changes"]))')
 chk "facility B sees none of facility A's data" "$N" "0"
 
 echo "== 7. Two-device concurrency: workflow state-priority =="
-QID="33333333-3333-4333-8333-333333333333"
-push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"queueEntries","entity_id":"'$QID'","op":"upsert","rev":1,"base_rev":0,"payload":{"facility_id":"fac-0062","status":"waiting"},"client_ts":"2026-08-19T10:00:00Z"}]}' >/dev/null
-push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"queueEntries","entity_id":"'$QID'","op":"upsert","rev":2,"base_rev":1,"payload":{"facility_id":"fac-0062","status":"completed"},"client_ts":"2026-08-19T10:05:00Z"}]}' >/dev/null
+QID="${RUN}-0000-4000-8000-000000000003"
+push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"queue_entry","entity_id":"'$QID'","op":"upsert","rev":1,"base_rev":0,"payload":{"facility_id":"fac-0062","status":"waiting"},"client_ts":"2026-08-19T10:00:00Z"}]}' >/dev/null
+push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"queue_entry","entity_id":"'$QID'","op":"upsert","rev":2,"base_rev":1,"payload":{"facility_id":"fac-0062","status":"completed"},"client_ts":"2026-08-19T10:05:00Z"}]}' >/dev/null
 # Device B (stale, base_rev=1) tries to set in_progress — must not bounce back
-RES=$(push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"queueEntries","entity_id":"'$QID'","op":"upsert","rev":2,"base_rev":1,"payload":{"facility_id":"fac-0062","status":"in_progress"},"client_ts":"2026-08-19T10:06:00Z"}]}')
+RES=$(push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"queue_entry","entity_id":"'$QID'","op":"upsert","rev":2,"base_rev":1,"payload":{"facility_id":"fac-0062","status":"in_progress"},"client_ts":"2026-08-19T10:06:00Z"}]}')
 ST=$(echo "$RES" | python3 -c 'import sys,json;print(json.load(sys.stdin)["results"][0]["server_payload"]["status"])')
 chk "queue converges forward to completed" "$ST" "completed"
 
 echo "== 8. Identity-critical contradiction escalates =="
-push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"patients","entity_id":"'$PID'","op":"upsert","rev":2,"base_rev":1,"payload":{"facility_id":"fac-0062","first_name":"Obinna","date_of_birth":"1990-06-06"},"client_ts":"2026-08-19T11:00:00Z"}]}' >/dev/null
-RES=$(push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"patients","entity_id":"'$PID'","op":"upsert","rev":2,"base_rev":1,"payload":{"facility_id":"fac-0062","first_name":"Obinna","date_of_birth":"1992-09-09"},"client_ts":"2026-08-19T11:01:00Z"}]}')
+push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"patient","entity_id":"'$PID'","op":"upsert","rev":2,"base_rev":1,"payload":{"facility_id":"fac-0062","first_name":"Obinna","date_of_birth":"1990-06-06"},"client_ts":"2026-08-19T11:00:00Z"}]}' >/dev/null
+RES=$(push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"patient","entity_id":"'$PID'","op":"upsert","rev":2,"base_rev":1,"payload":{"facility_id":"fac-0062","first_name":"Obinna","date_of_birth":"1992-09-09"},"client_ts":"2026-08-19T11:01:00Z"}]}')
 NR=$(echo "$RES" | python3 -c 'import sys,json;r=json.load(sys.stdin)["results"][0];print(r.get("needs_review"))')
 chk "contradictory DOB flagged needs_review" "$NR" "True"
 ADMIN=$(login admin 5555 fac-0062 dev-A | python3 -c 'import sys,json;print(json.load(sys.stdin)["accessToken"])')
-NC=$(curl -s "$API/admin/conflicts" -H "authorization: Bearer $ADMIN" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)))')
-chk "conflict reached the admin queue (not dropped)" "$NC" "1"
+# Newest first, so this run's escalation is the head of the queue.
+NC=$(curl -s "$API/admin/conflicts" -H "authorization: Bearer $ADMIN" | python3 -c "import sys,json;q=json.load(sys.stdin);print(q[0]['entityId'] if q else 'EMPTY')")
+chk "conflict reached the admin queue (not dropped)" "$NC" "$PID"
 
 echo "== 9. RBAC on admin queue =="
 CODE=$(curl -s "$API/admin/conflicts" -H "authorization: Bearer $NURSE_A" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("error",{}).get("code","NONE"))')
 chk "nurse cannot read the admin conflict queue" "$CODE" "FORBIDDEN"
 
 echo "== 10. Config is hub-authoritative =="
-ST=$(push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"facilities","entity_id":"44444444-4444-4444-8444-444444444444","op":"upsert","rev":1,"base_rev":0,"payload":{"facility_id":"fac-0062","name":"Renamed"},"client_ts":"2026-08-19T10:00:00Z"}]}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["results"][0]["status"])')
+ST=$(push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"facility","entity_id":"'"${RUN}"-0000-4000-8000-000000000004'","op":"upsert","rev":1,"base_rev":0,"payload":{"facility_id":"fac-0062","name":"Renamed"},"client_ts":"2026-08-19T10:00:00Z"}]}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["results"][0]["status"])')
 chk "client cannot push config" "$ST" "rejected"
 
 echo "== 11. Baseline snapshot is scoped =="
 NB=$(curl -s "$API/sync/baseline" -H "authorization: Bearer $NURSE_B" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["changes"]))')
 chk "facility B baseline excludes facility A rows" "$NB" "0"
-NA=$(curl -s "$API/sync/baseline" -H "authorization: Bearer $NURSE_A" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["changes"]))')
-chk "facility A baseline returns its rows" "$NA" "2"
+NA=$(curl -s "$API/sync/baseline?limit=500" -H "authorization: Bearer $NURSE_A" | python3 -c 'import sys,json;print("some" if len(json.load(sys.stdin)["changes"]) else "none")')
+chk "facility A baseline returns its own rows" "$NA" "some"
 
 echo
 echo "RESULT: $pass passed, $fail failed"

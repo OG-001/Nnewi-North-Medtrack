@@ -23,21 +23,25 @@ import { getDeviceId } from "./device";
 
 const META_KEY = "meta";
 
-/** Dexie table names that participate in sync, keyed by wire `entity_type`. */
-const TABLES: Record<string, string> = {
-  patients: "patients",
-  patientLinks: "patientLinks",
-  encounters: "encounters",
-  referrals: "referrals",
-  pregnancies: "pregnancies",
-  ancScheduleItems: "ancScheduleItems",
-  ancVisits: "ancVisits",
-  deliveries: "deliveries",
-  immunizationDoses: "immunizationDoses",
-  queueEntries: "queueEntries",
-  smsMessages: "smsMessages",
-  monthlyReports: "monthlyReports",
-  auditEvents: "auditEvents",
+/**
+ * Wire `entity_type` to the Dexie table that stores it. The keys must match
+ * `ENTITY_TYPE_BY_TABLE` in ../db/repository.ts, which is what the outbox
+ * writes; a mismatch here means the hub rejects every change of that type.
+ */
+export const TABLE_BY_ENTITY_TYPE: Record<string, string> = {
+  patient: "patients",
+  patient_link: "patientLinks",
+  encounter: "encounters",
+  referral: "referrals",
+  pregnancy: "pregnancies",
+  anc_schedule_item: "ancScheduleItems",
+  anc_visit: "ancVisits",
+  delivery: "deliveries",
+  immunization_dose: "immunizationDoses",
+  queue_entry: "queueEntries",
+  sms_message: "smsMessages",
+  monthly_report: "monthlyReports",
+  audit_event: "auditEvents",
 };
 
 export async function getMeta(): Promise<SyncMeta> {
@@ -174,7 +178,7 @@ async function pushBatch(): Promise<PushOutcome & { remaining: boolean }> {
 
 /** Apply one hub change to the local store. Hub rows win over local copies. */
 async function applyChange(change: SyncChange): Promise<void> {
-  const tableName = TABLES[change.entity_type];
+  const tableName = TABLE_BY_ENTITY_TYPE[change.entity_type];
   if (!tableName || !change.payload) return;
   const table = db.table(tableName);
 
@@ -246,7 +250,7 @@ export async function runSyncCycle(maxRounds = 10): Promise<CycleResult> {
 export async function purgeOutOfScope(scope: string[] | null): Promise<number> {
   if (scope === null) return 0;
   let removed = 0;
-  for (const tableName of Object.values(TABLES)) {
+  for (const tableName of Object.values(TABLE_BY_ENTITY_TYPE)) {
     const table = db.table(tableName);
     const rows = (await table.toArray()) as { id: string; facility_id?: string }[];
     const doomed = rows.filter((r) => r.facility_id && !scope.includes(r.facility_id));

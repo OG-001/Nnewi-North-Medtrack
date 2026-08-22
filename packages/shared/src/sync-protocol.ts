@@ -15,25 +15,30 @@ export const ENTITY_CLASSES = [
 export type EntityClass = (typeof ENTITY_CLASSES)[number];
 
 /**
- * Which class each synced entity belongs to. `entity_type` values match the
- * Dexie table names in apps/web/src/db/db.ts.
+ * Which class each synced entity belongs to.
+ *
+ * The keys are the **wire** `entity_type` values: snake_case singular, taken
+ * from `ENTITY_TYPE_BY_TABLE` in `apps/web/src/db/repository.ts`, which is what
+ * the outbox actually writes. They are deliberately not the Dexie table names.
+ * A table name is a local storage detail; the entity type is the contract, and
+ * it matches `docs/architecture/data-model.md`.
  */
 export const ENTITY_CLASS_BY_TYPE = {
-  patients: "demographics",
-  patientLinks: "structural",
-  encounters: "append_only",
-  referrals: "append_only",
-  pregnancies: "workflow",
-  ancScheduleItems: "workflow",
-  ancVisits: "append_only",
-  deliveries: "append_only",
-  immunizationDoses: "workflow",
-  queueEntries: "workflow",
-  smsMessages: "append_only",
-  monthlyReports: "workflow",
-  auditEvents: "append_only",
-  facilities: "config",
-  users: "config",
+  patient: "demographics",
+  patient_link: "structural",
+  encounter: "append_only",
+  referral: "append_only",
+  pregnancy: "workflow",
+  anc_schedule_item: "workflow",
+  anc_visit: "append_only",
+  delivery: "append_only",
+  immunization_dose: "workflow",
+  queue_entry: "workflow",
+  sms_message: "append_only",
+  monthly_report: "workflow",
+  audit_event: "append_only",
+  facility: "config",
+  user_account: "config",
 } as const satisfies Record<string, EntityClass>;
 
 export type SyncEntityType = keyof typeof ENTITY_CLASS_BY_TYPE;
@@ -53,11 +58,11 @@ export function entityClassOf(entityType: string): EntityClass | null {
  * advanced" state wins so two stations converge forward, never bounce back.
  */
 export const STATE_PRIORITY: Record<string, string[]> = {
-  queueEntries: ["waiting", "in_progress", "left_without_being_seen", "completed"],
-  immunizationDoses: ["due", "scheduled", "missed", "given"],
-  ancScheduleItems: ["due", "scheduled", "missed", "completed"],
-  pregnancies: ["active", "transferred", "delivered", "closed"],
-  monthlyReports: ["draft", "submitted", "locked"],
+  queue_entry: ["waiting", "in_progress", "left_without_being_seen", "completed"],
+  immunization_dose: ["due", "scheduled", "missed", "given"],
+  anc_schedule_item: ["due", "scheduled", "missed", "completed"],
+  pregnancy: ["active", "transferred", "delivered", "closed"],
+  monthly_report: ["draft", "submitted", "locked"],
 };
 
 /**
@@ -65,7 +70,7 @@ export const STATE_PRIORITY: Record<string, string[]> = {
  * it escalates to the admin conflict queue (offline-sync-design §5 Escalation).
  */
 export const IDENTITY_CRITICAL_FIELDS: Record<string, string[]> = {
-  patients: ["date_of_birth", "sex", "mrn"],
+  patient: ["date_of_birth", "sex", "mrn"],
 };
 
 // ---- Wire shapes ----

@@ -122,10 +122,18 @@ credentials; with none configured the hub queues messages rather than sending.
 figure to its source rows, a review-and-lock workflow, adjustments after lock,
 CSV and DHIS2 export, and an LGA rollup over locked reports only.
 
-**Deferred (per the plan):** production hardening and the pilot release
-(Phase 10). SMS has not been run against a real provider sandbox, so Phase 7 is
-not signed off; there is no PDF export, and the Oversight page still computes its
-LGA view on-device rather than reading the hub rollup. See the
+**Implemented (hardening, Phase 10 engineering):** a production stack with TLS,
+the API served same-origin, no database port exposed, non-root containers,
+security headers, encrypted backups with a rehearsed restore, readiness and
+metrics endpoints, a secret scanner, and runbooks under
+[`docs/operations/`](docs/operations/).
+
+**Not done, and blocking go-live:** nothing has been deployed. There has been no
+production restore rehearsal, no verification on real low-end Android devices, no
+live alerting, no staff training, no UAT run, and no pilot. The data controller
+and Data Protection Officer are still unnamed, and the pilot cannot lawfully
+begin without them. SMS has never run against a real provider. See the Phase 10
+change-log entry for the full list. See the
 change-log under [`devops/change_log/`](devops/change_log/) — the Phase 3 entry
 records what is still open before that phase's exit gate can be signed off.
 

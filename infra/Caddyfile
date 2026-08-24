@@ -1,0 +1,43 @@
+# Reverse proxy with automatic TLS (Let's Encrypt) for the production stack.
+#
+# The API is served on the SAME origin under /api, so the PWA makes no
+# cross-origin request: no CORS, and a tighter Content-Security-Policy than a
+# split origin would allow.
+#
+# {$PHC_DOMAIN} and {$PHC_ACME_EMAIL} come from infra/.env.
+
+{
+	email {$PHC_ACME_EMAIL}
+	# Certificates are obtained and renewed automatically. For an on-premises
+	# deployment with no public DNS, replace this block with `tls internal`
+	# or point it at your own certificate.
+}
+
+{$PHC_DOMAIN} {
+	encode gzip
+
+	# HSTS belongs here: this is the only component that knows the request
+	# arrived over TLS. Two years, subdomains included, preload-eligible.
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		-Server
+	}
+
+	# The sync hub.
+	handle /api/* {
+		reverse_proxy api:3000 {
+			health_uri /api/v1/system/health
+			health_interval 30s
+		}
+	}
+
+	# Everything else is the PWA.
+	handle {
+		reverse_proxy web:8080
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

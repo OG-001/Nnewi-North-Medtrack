@@ -1,0 +1,168 @@
+# Production stack, self-hosted in Nigeria (NDPA 2023 data residency).
+#
+#   docker compose -f infra/docker-compose.prod.yml --env-file infra/.env up -d
+#
+# Differences from the development stack that matter:
+#   - Postgres and Redis publish NO host ports. They are reachable only on the
+#     internal network, so the database is not exposed to the internet.
+#   - Every secret comes from the environment. None has a default here.
+#   - Caddy terminates TLS and serves the API same-origin under /api.
+#   - Resource limits and restart policies, so one runaway container cannot take
+#     the clinic offline.
+#
+# Before running this, read docs/operations/deployment-runbook.md.
+
+name: phc-track
+
+services:
+  proxy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      PHC_DOMAIN: ${PHC_DOMAIN:?PHC_DOMAIN is required}
+      PHC_ACME_EMAIL: ${PHC_ACME_EMAIL:?PHC_ACME_EMAIL is required}
+    depends_on:
+      - web
+      - api
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.web
+      args:
+        # Same-origin API path; see the Caddyfile.
+        VITE_API_BASE_URL: /api/v1
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.api
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}?schema=public
+      # No default. The stack refuses to start without a real secret.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required and must not be a default}
+      ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-15m}
+      REFRESH_TOKEN_TTL_DAYS: ${REFRESH_TOKEN_TTL_DAYS:-30}
+      PORT: 3000
+      # Same-origin in production, so CORS is not used. Set only if you split
+      # the origins, and then never to "*".
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://${PHC_DOMAIN}}
+      REDIS_URL: redis://redis:6379
+      SMS_PROVIDER: ${SMS_PROVIDER:-africastalking}
+      SMS_SENDER_ID: ${SMS_SENDER_ID:-}
+      SMS_REMINDERS_ENABLED: ${SMS_REMINDERS_ENABLED:-false}
+      AT_API_KEY: ${AT_API_KEY:-}
+      AT_USERNAME: ${AT_USERNAME:-}
+      AT_WEBHOOK_SECRET: ${AT_WEBHOOK_SECRET:-}
+      TERMII_API_KEY: ${TERMII_API_KEY:-}
+      TERMII_WEBHOOK_SECRET: ${TERMII_WEBHOOK_SECRET:-}
+      DHIS2_ELEMENT_MAP: ${DHIS2_ELEMENT_MAP:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 768M
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    # No `ports`. The database is reachable only inside this network.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
+    volumes:
+      - redisdata:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+
+  # Scheduled encrypted backups. Writes to ./backups on the host; shipping them
+  # off-host (in-country) is docs/operations/backup-and-restore.md step 4.
+  #
+  # The sidecar runs as uid 70 (postgres), so create the directory and give it
+  # ownership before first start, or every backup fails on permissions:
+  #   mkdir -p infra/backups && sudo chown 70:70 infra/backups
+  backup:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.backup
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/scripts/backup-loop.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:?required}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?required}
+      PGDATABASE: ${POSTGRES_DB:?required}
+      BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:?BACKUP_PASSPHRASE is required}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:

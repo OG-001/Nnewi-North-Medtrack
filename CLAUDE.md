@@ -166,11 +166,17 @@ parallel once phase 3 (the sync engine) has exited.
 The NestJS sync hub in `apps/api/` is built: facility-scoped auth, the push/pull sync
 protocol with conflict resolution, **server-side scope enforcement**, and the SMS module.
 
-Still **not built**: production hardening and the pilot release (Phase 10), the server-side
-reporting projection (part of Phase 8), and an offline queue for SMS composed while
-disconnected. Phase 7 has no provider-sandbox run, so it is not signed off. An agent must
-never describe a deferred capability as if it exists, and must not describe a built one as
-missing: check `devops/change_log/` for the current position.
+Phases 7 (SMS) and 8 (reporting) are built. Phase 10's **engineering** deliverables are
+built: production compose, TLS, hardened images, security headers, encrypted backups with a
+rehearsed restore, readiness and metrics endpoints, a secret scanner, and the runbooks in
+`docs/operations/`.
+
+**Nothing has been deployed.** No production restore rehearsal, no real-device verification,
+no live alerting, no training, no UAT, no pilot. The controller and DPO are unnamed (Q9), so
+the pilot cannot lawfully begin. SMS has never run against a real provider.
+
+An agent must never describe a deferred capability as if it exists, and must not describe a
+built one as missing. Check `devops/change_log/` for the current position.
 
 ---
 

@@ -1,0 +1,8 @@
+# Backup sidecar: postgres client tools plus openssl for encryption.
+#
+# The stock postgres:16-alpine image does NOT ship openssl, so backup.sh cannot
+# encrypt with it. This image exists solely to add that, and it is why the
+# backup service does not use the plain postgres image.
+FROM postgres:16-alpine
+RUN apk add --no-cache openssl
+USER postgres

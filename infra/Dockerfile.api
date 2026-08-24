@@ -1,5 +1,6 @@
-# NestJS sync hub (apps/api). Built from the repo root:
-#   docker compose -f infra/docker-compose.yml up --build
+# NestJS sync hub (apps/api), running as an unprivileged user.
+# Build context is the repo root:  docker build -f infra/Dockerfile.api .
+
 FROM node:20-alpine AS build
 WORKDIR /repo
 RUN corepack enable
@@ -23,8 +24,17 @@ ENV NODE_ENV=production
 COPY --from=build /repo/node_modules node_modules
 COPY --from=build /repo/packages/shared packages/shared
 COPY --from=build /repo/apps/api apps/api
-COPY --from=build /repo/package.json pnpm-workspace.yaml ./
+COPY --from=build /repo/package.json /repo/pnpm-workspace.yaml ./
+
+# `node` (uid 1000) ships with the image; never run the hub as root.
+RUN chown -R node:node /repo
+USER node
 
 EXPOSE 3000
-# Migrations are applied on start so a fresh volume comes up ready.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3000/api/v1/system/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+# Migrations are applied on start so a fresh volume comes up ready. This is
+# `migrate deploy`, which only applies committed migrations and never generates
+# or resets one.
 CMD ["sh", "-c", "cd apps/api && npx prisma migrate deploy && node dist/src/main.js"]

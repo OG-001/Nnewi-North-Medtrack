@@ -1,16 +1,31 @@
-# Build the offline-first PWA and serve it with Nginx (self-hostable in-country).
-# Build context is the repo root: docker build -f infra/Dockerfile.web .
+# Builds the offline-first PWA and serves it with nginx as an unprivileged user.
+# Build context is the repo root:  docker build -f infra/Dockerfile.web .
+#
+# VITE_API_BASE_URL is baked in at build time. In the production stack the API
+# is same-origin under /api, so the default below is what production uses.
+
 FROM node:20-alpine AS build
 RUN corepack enable
 WORKDIR /repo
-COPY pnpm-workspace.yaml package.json tsconfig.base.json ./
+
+# Manifests first, so a source-only change does not reinstall dependencies.
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY apps/web/package.json apps/web/package.json
-RUN pnpm install --frozen-lockfile=false
-COPY . .
+RUN pnpm install --frozen-lockfile
+
+COPY packages/shared packages/shared
+COPY apps/web apps/web
+
+ARG VITE_API_BASE_URL=/api/v1
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 RUN pnpm --filter @phc/web build
 
-FROM nginx:1.27-alpine AS run
+# nginx-unprivileged runs as uid 101 and binds 8080, so no root in the runtime.
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS run
 COPY infra/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html
-EXPOSE 80
+USER 101
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1

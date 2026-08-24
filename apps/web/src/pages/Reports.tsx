@@ -4,12 +4,16 @@ import { db } from "../db/db";
 import { useScope, notDeleted } from "../lib/scope";
 import { useSession } from "../lib/session";
 import { PageHeader, Badge } from "../components/ui";
+// The reporting engine lives in @phc/shared so the figure a facility sees here
+// is computed by the same code the hub uses for the locked report and the LGA
+// rollup. A second implementation would eventually disagree with the first.
 import {
   computeMonthlyReport,
   figuresToCsv,
   figuresToDhis2,
   type ReportFigure,
-} from "../lib/reporting";
+} from "@phc/shared";
+import { ReportHubPanel } from "../components/ReportHubPanel";
 
 const now = new Date();
 
@@ -80,14 +84,28 @@ export function ReportsPage() {
   function exportCsv() {
     download(
       `phc-report-${year}-${String(month).padStart(2, "0")}.csv`,
-      figuresToCsv(figures, { facility: facility?.name ?? "All facilities", year, month }),
+      figuresToCsv(figures, {
+        facility: facility?.name ?? "All facilities",
+        facilityCode: facility?.code ?? "ALL",
+        year,
+        month,
+      }),
       "text/csv",
     );
   }
   function exportDhis2() {
     download(
       `dhis2-import-${year}-${String(month).padStart(2, "0")}.json`,
-      JSON.stringify(figuresToDhis2(figures, { facilityCode: facility?.code ?? "ALL", year, month }), null, 2),
+      JSON.stringify(
+        figuresToDhis2(figures, {
+          facility: facility?.name ?? "All facilities",
+          facilityCode: facility?.code ?? "ALL",
+          year,
+          month,
+        }),
+        null,
+        2,
+      ),
       "application/json",
     );
   }
@@ -143,10 +161,12 @@ export function ReportsPage() {
         ))}
       </div>
 
+      <ReportHubPanel year={year} month={month} />
+
       <p className="mt-5 rounded-lg bg-brand-50 px-4 py-3 text-xs text-brand-800">
-        Monthly report lock (officer-in-charge) and live DHIS2 API integration are part of Phase 8/Q4.
-        The DHIS2 export here produces a structured import file; map <code>dataElement</code> keys to your
-        LGA’s DHIS2 UIDs before upload.
+        The DHIS2 export produces a structured import file. Until your LGA&rsquo;s DHIS2 UID mapping
+        is configured (Open question Q4), <code>dataElement</code> carries our own key and the export
+        names every unmapped element, so a partial mapping cannot be mistaken for a complete one.
       </p>
     </div>
   );

@@ -34,7 +34,11 @@ export class JwtAuthGuard implements CanActivate {
         userId: claims.sub,
         username: claims.username,
         roles: claims.roles ?? [],
-        facilityScope: claims.facilityScope ?? [],
+        // `null` is meaningful: it is LGA-wide scope for an oversight role, and
+        // it must survive. `?? []` would collapse it to "no facilities", which
+        // denies an LGA officer everything instead of granting them oversight.
+        // A missing claim still falls back to the most restrictive value.
+        facilityScope: claims.facilityScope === undefined ? [] : claims.facilityScope,
         deviceId: claims.deviceId,
       };
       req.principal = principal;

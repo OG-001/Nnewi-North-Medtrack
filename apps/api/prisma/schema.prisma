@@ -229,3 +229,43 @@ model SmsMessage {
   @@index([providerMessageId])
   @@map("sms_message")
 }
+
+/// A facility's NHMIS month. Draft until the officer-in-charge locks it; a
+/// locked report is immutable and later corrections become adjustments.
+model MonthlyReport {
+  id          String    @id @default(uuid()) @db.Uuid
+  facilityId  String    @map("facility_id")
+  year        Int
+  month       Int
+  /// The computed ReportFigure[] from packages/shared.
+  figures     Json
+  status      String    @default("draft")
+  generatedAt DateTime  @default(now()) @map("generated_at")
+  generatedBy String?   @map("generated_by")
+  lockedAt    DateTime? @map("locked_at")
+  lockedBy    String?   @map("locked_by")
+
+  adjustments ReportAdjustment[]
+
+  @@unique([facilityId, year, month])
+  @@index([year, month])
+  @@map("monthly_report")
+}
+
+/// A correction to a locked report. The locked figures are never overwritten;
+/// the adjustment is the audit trail of what changed and why.
+model ReportAdjustment {
+  id         String   @id @default(uuid()) @db.Uuid
+  reportId   String   @map("report_id") @db.Uuid
+  figureKey  String   @map("figure_key")
+  fromValue  Int      @map("from_value")
+  toValue    Int      @map("to_value")
+  reason     String
+  createdBy  String   @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  report MonthlyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("report_adjustment")
+}

@@ -117,9 +117,15 @@ a reminder scan over ANC and immunization due dates, signature-verified delivery
 webhooks, and a send log. Configure with `SMS_PROVIDER` plus that provider's
 credentials; with none configured the hub queues messages rather than sending.
 
-**Deferred (per the plan):** the relational reporting projection (Phase 8) and
-production hardening (Phase 10). SMS has not been run against a real provider
-sandbox, so Phase 7 is not signed off. See the
+**Implemented (reporting, Phase 8):** the NHMIS aggregation engine in
+`packages/shared`, used by both the PWA and the hub, with drill-down from any
+figure to its source rows, a review-and-lock workflow, adjustments after lock,
+CSV and DHIS2 export, and an LGA rollup over locked reports only.
+
+**Deferred (per the plan):** production hardening and the pilot release
+(Phase 10). SMS has not been run against a real provider sandbox, so Phase 7 is
+not signed off; there is no PDF export, and the Oversight page still computes its
+LGA view on-device rather than reading the hub rollup. See the
 change-log under [`devops/change_log/`](devops/change_log/) — the Phase 3 entry
 records what is still open before that phase's exit gate can be signed off.
 

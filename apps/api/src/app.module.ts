@@ -8,6 +8,7 @@ import { SyncModule } from "./sync/sync.module";
 import { SystemModule } from "./system/system.module";
 import { AdminModule } from "./admin/admin.module";
 import { SmsModule } from "./sms/sms.module";
+import { ReportsModule } from "./reports/reports.module";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 import { RolesGuard } from "./common/guards/roles.guard";
 
@@ -22,6 +23,7 @@ import { RolesGuard } from "./common/guards/roles.guard";
     SystemModule,
     AdminModule,
     SmsModule,
+    ReportsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

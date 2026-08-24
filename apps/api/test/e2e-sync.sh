@@ -97,8 +97,13 @@ ST=$(push "$NURSE_A" '{"device_id":"dev-A","changes":[{"entity_type":"facility",
 chk "client cannot push config" "$ST" "rejected"
 
 echo "== 11. Baseline snapshot is scoped =="
-NB=$(curl -s "$API/sync/baseline" -H "authorization: Bearer $NURSE_B" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)["changes"]))')
-chk "facility B baseline excludes facility A rows" "$NB" "0"
+# Not "B is empty": B has its own rows. The property is that none of THIS run's
+# facility-A rows appear in B's baseline.
+NB=$(curl -s "$API/sync/baseline?limit=500" -H "authorization: Bearer $NURSE_B" \
+  | PID="$PID" QID="$QID" python3 -c 'import sys,json,os
+ids={c["entity_id"] for c in json.load(sys.stdin)["changes"]}
+print("leaked" if (os.environ["PID"] in ids or os.environ["QID"] in ids) else "clean")')
+chk "facility B baseline excludes facility A rows" "$NB" "clean"
 NA=$(curl -s "$API/sync/baseline?limit=500" -H "authorization: Bearer $NURSE_A" | python3 -c 'import sys,json;print("some" if len(json.load(sys.stdin)["changes"]) else "none")')
 chk "facility A baseline returns its own rows" "$NA" "some"
 

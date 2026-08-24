@@ -8,6 +8,7 @@ import {
   toISODate,
 } from "@phc/shared";
 import { db } from "../db/db";
+import { SendReminderButton } from "../components/SendReminderButton";
 import { createRecord, saveRecord } from "../db/repository";
 import { useSession } from "../lib/session";
 import { useScope, notDeleted } from "../lib/scope";
@@ -92,17 +93,28 @@ export function ImmunizationPage() {
             {overdue.slice(0, 8).map((d) => {
               const p = patientById.get(d.patient_id);
               return (
-                <button
+                // A row, not a button: it carries its own recall action, and a
+                // button inside a button is invalid markup.
+                <div
                   key={d.id}
-                  onClick={() => setSelectedId(d.patient_id)}
-                  className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-slate-50"
+                  className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-sm"
                 >
-                  <span>
+                  <button
+                    onClick={() => setSelectedId(d.patient_id)}
+                    className="min-w-0 flex-1 text-left hover:text-brand-700"
+                  >
                     <span className="font-medium text-slate-800">{p ? displayName(p) : "Unknown"}</span>
                     <span className="ml-2 text-xs text-slate-400">{d.dose_label} · due {formatDate(d.due_date)}</span>
+                  </button>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <SendReminderButton
+                      patient={p}
+                      templateKey="immunization_reminder"
+                      dueDate={formatDate(d.due_date)}
+                    />
+                    <Badge tone="red">overdue</Badge>
                   </span>
-                  <Badge tone="red">overdue</Badge>
-                </button>
+                </div>
               );
             })}
           </div>

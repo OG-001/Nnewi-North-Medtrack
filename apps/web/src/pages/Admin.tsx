@@ -12,6 +12,7 @@ import {
   type Permission,
 } from "@phc/shared";
 import { db } from "../db/db";
+import { SmsAdmin } from "../components/SmsAdmin";
 import { createRecord, saveRecord } from "../db/repository";
 import { useSession } from "../lib/session";
 import { getDeviceId } from "../lib/device";
@@ -25,6 +26,7 @@ const TABS: Tab[] = [
   { key: "facilities", label: "Facilities", perm: "facility.manage" },
   { key: "staff", label: "Staff", perm: "staff.manage" },
   { key: "config", label: "Schedules", perm: "schedule.edit" },
+  { key: "sms", label: "SMS", perm: "sms.send" },
   { key: "audit", label: "Audit log", perm: "audit.view" },
   { key: "health", label: "Sync & health", perm: "sync.health.view" },
 ];
@@ -64,6 +66,7 @@ export function AdminPage() {
       {tab === "facilities" && <FacilitiesTab />}
       {tab === "staff" && <StaffTab />}
       {tab === "config" && <ConfigTab />}
+      {tab === "sms" && <SmsAdmin />}
       {tab === "audit" && <AuditTab />}
       {tab === "health" && <HealthTab />}
     </div>
@@ -326,8 +329,9 @@ function HealthTab() {
           <div className="flex justify-between"><dt className="text-slate-400">Acked (synced)</dt><dd className="text-slate-700">{acked}</dd></div>
         </dl>
         <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-          The sync engine here drains the local outbox and stamps last-synced. The hub-side pull/push
-          protocol (NestJS) lands in Phase 3 — this UI already reflects its state machine.
+          Writes land in the local outbox first. When the sync hub is reachable, a cycle pushes
+          them and pulls back what other devices recorded; with no hub, work simply accumulates
+          here until there is one.
         </p>
       </div>
     </div>

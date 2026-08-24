@@ -184,3 +184,48 @@ model AuditEvent {
   @@index([entityType, entityId])
   @@map("audit_event")
 }
+
+/// Admin-editable message templates, layered over the seeded defaults in
+/// packages/shared (Global Constraint 9: templates are config, not code).
+model SmsTemplate {
+  key         String   @id
+  description String
+  bodyEn      String   @map("body_en")
+  bodyIg      String   @map("body_ig")
+  updatedBy   String?  @map("updated_by")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("sms_template")
+}
+
+/// The send log. Every attempt is recorded, including one blocked by the
+/// consent gate, so "why did this patient get no reminder" is answerable.
+model SmsMessage {
+  id                String    @id
+  patientId         String    @map("patient_id")
+  facilityId        String    @map("facility_id")
+  templateKey       String    @map("template_key")
+  language          String
+  renderedBody      String    @map("rendered_body")
+  toPhone           String    @map("to_phone")
+  status            String
+  /// Set when the consent gate blocked the send.
+  skippedReason     String?   @map("skipped_reason")
+  failureReason     String?   @map("failure_reason")
+  provider          String?
+  providerMessageId String?   @map("provider_message_id")
+  /// GSM-7 segments, the billing unit.
+  segments          Int       @default(1)
+  triggeredBy       String    @map("triggered_by")
+  /// Deduplicates a reminder for the same patient and due event.
+  reminderKey       String?   @unique @map("reminder_key")
+  scheduledFor      DateTime? @map("scheduled_for")
+  sentAt            DateTime? @map("sent_at")
+  deliveredAt       DateTime? @map("delivered_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@index([facilityId, status])
+  @@index([patientId])
+  @@index([providerMessageId])
+  @@map("sms_message")
+}

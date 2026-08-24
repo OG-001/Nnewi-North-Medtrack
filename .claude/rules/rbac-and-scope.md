@@ -59,16 +59,18 @@ a component.
 |------------------------|------------------------------------|----------------|
 | Scoped authentication  | `apps/web/src/lib/session.tsx`     | Enforced now   |
 | Client-side data scope | `apps/web/src/lib/scope.ts`        | Enforced now   |
-| Server-side sync scope | `apps/api/` sync module            | Not built      |
+| Server-side sync scope | `apps/api/src/sync/sync.service.ts`| Enforced now   |
 
 `useScope()` in `apps/web/src/lib/scope.ts` returns `isLgaWide`, `currentFacilityId`,
 `facilityIds` (null meaning all facilities), and an `inScope(record)` predicate that also
 rejects soft-deleted rows. **Every list and detail read must pass through it.** A query that
 reads a Dexie table without a scope filter is a finding.
 
-The client-side layer is a usability and defence-in-depth measure, not the production
-guarantee. **The production guarantee is server-side and does not exist yet.** Never claim
-otherwise in a report, a change record, or a comment.
+The client-side layer is a usability and defence-in-depth measure. **The production
+guarantee is the server-side layer**, which is now enforced in the hub: `resolveScope`
+refuses a pull naming a facility outside the caller's scope, and `applyOne` rejects a push
+carrying a foreign `facility_id`. It only protects a deployment that actually runs the hub,
+so never describe a hub-less device as having three layers.
 
 ---
 

@@ -223,5 +223,6 @@ Subagents do not inherit the primary's injected context. Every delegation prompt
    `docs/implementation/phase-N-*.md`, its own memory, and
    `.claude/agent-memory/_shared/LESSONS.md` before starting.
 4. **The instruction to save what it learned** afterward, per the active mode.
-5. **What is not built yet**, so the subagent does not assume the NestJS hub, server-side
-   scope enforcement, live SMS, or the test harness already exists.
+5. **What is not built yet.** The hub, server-side scope enforcement, the SMS module and
+   the test harness now exist. Still missing: Phase 10 hardening, the server-side reporting
+   projection, an offline queue for SMS, and any run against a real SMS provider.

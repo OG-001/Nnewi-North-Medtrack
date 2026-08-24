@@ -7,3 +7,4 @@ export * from "./anc-model";
 export * from "./permissions";
 export * from "./facilities";
 export * from "./sync-protocol";
+export * from "./sms";

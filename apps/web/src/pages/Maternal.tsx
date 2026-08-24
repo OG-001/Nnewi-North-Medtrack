@@ -8,6 +8,7 @@ import {
   toISODate,
 } from "@phc/shared";
 import { db } from "../db/db";
+import { SendReminderButton } from "../components/SendReminderButton";
 import { createRecord, saveRecord } from "../db/repository";
 import { useSession } from "../lib/session";
 import { useScope, notDeleted } from "../lib/scope";
@@ -78,6 +79,11 @@ export function MaternalPage() {
                       Contact {i.contact_number} · was due {formatDate(i.target_date)}
                     </span>
                   </div>
+                  <SendReminderButton
+                    patient={p}
+                    templateKey="missed_visit_recall"
+                    dueDate={formatDate(i.target_date)}
+                  />
                   <Badge tone="red">SMS recall eligible</Badge>
                 </div>
               );

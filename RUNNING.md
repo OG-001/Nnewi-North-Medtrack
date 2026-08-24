@@ -111,8 +111,15 @@ persistence with outbox + audit, installable PWA, dark-green theme.
 facility-scoped auth, the push/pull change-log protocol, conflict resolution with
 an admin escalation queue, and server-side scope enforcement.
 
-**Deferred (per the plan):** live **SMS** dispatch (Phase 7), the relational
-reporting projection (Phase 8), and production hardening (Phase 10). See the
+**Implemented (SMS, Phase 7):** provider-agnostic dispatch with Africa's Talking
+and Termii adapters, admin-editable English and Igbo templates, the consent gate,
+a reminder scan over ANC and immunization due dates, signature-verified delivery
+webhooks, and a send log. Configure with `SMS_PROVIDER` plus that provider's
+credentials; with none configured the hub queues messages rather than sending.
+
+**Deferred (per the plan):** the relational reporting projection (Phase 8) and
+production hardening (Phase 10). SMS has not been run against a real provider
+sandbox, so Phase 7 is not signed off. See the
 change-log under [`devops/change_log/`](devops/change_log/) — the Phase 3 entry
 records what is still open before that phase's exit gate can be signed off.
 

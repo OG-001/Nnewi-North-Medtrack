@@ -15,7 +15,7 @@
     "preview": "pnpm --filter @phc/web preview",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm --filter @phc/web lint",
-    "test": "pnpm -r --filter @phc/api --filter @phc/web test",
+    "test": "pnpm -r --filter @phc/shared --filter @phc/api --filter @phc/web test",
     "db:migrate": "pnpm --filter @phc/api prisma:migrate",
     "db:seed": "pnpm --filter @phc/api seed",
     "e2e": "pnpm --filter @phc/web e2e",

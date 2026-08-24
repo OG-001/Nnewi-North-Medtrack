@@ -68,7 +68,8 @@ because the upsert is idempotent.
 
 ## 4. The protocol
 
-Two operations against the hub, both under `/api/v1/sync` (Phase 3, not built yet):
+Four operations against the hub, under `/api/v1/sync`, implemented in
+`apps/api/src/sync/sync.controller.ts`:
 
 ```text
 GET  /api/v1/sync/changes?since=<seq>&scope=<facilityIds>&limit=N

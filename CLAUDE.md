@@ -21,7 +21,7 @@ in `.claude/agents/*.md`; topic rules live in `.claude/rules/*.md`.
 | Path              | What it is                                                     |
 |-------------------|----------------------------------------------------------------|
 | `apps/web/`       | The offline-first PWA. React 18, TypeScript, Vite, Tailwind, Dexie. |
-| `apps/api/`       | The NestJS sync hub. **Does not exist yet.** Phases 1 and 3.   |
+| `apps/api/`       | The NestJS sync hub: auth, sync, SMS, admin. Phases 1, 3, 7.   |
 | `packages/shared/`| Domain logic shared by the PWA and the future API.             |
 | `infra/`          | Docker, Compose, nginx, and the environment template.          |
 | `devops/`         | The per-phase change log. Historical record of what shipped.   |
@@ -162,9 +162,15 @@ matter to every agent:
 The minimum viable product is phases 0, 1, 2, 3, and 6. Phases 4, 5, and 6 may run in
 parallel once phase 3 (the sync engine) has exited.
 
-**Current state as of 2026-08-11**: the PWA in `apps/web/` is built and working offline. The
-NestJS sync hub, server-side scope enforcement, live SMS dispatch, and production hardening
-are **not built**. An agent must never describe a deferred capability as if it exists.
+**Current state as of 2026-08-24**: the PWA in `apps/web/` is built and working offline.
+The NestJS sync hub in `apps/api/` is built: facility-scoped auth, the push/pull sync
+protocol with conflict resolution, **server-side scope enforcement**, and the SMS module.
+
+Still **not built**: production hardening and the pilot release (Phase 10), the server-side
+reporting projection (part of Phase 8), and an offline queue for SMS composed while
+disconnected. Phase 7 has no provider-sandbox run, so it is not signed off. An agent must
+never describe a deferred capability as if it exists, and must not describe a built one as
+missing: check `devops/change_log/` for the current position.
 
 ---
 

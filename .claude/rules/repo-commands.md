@@ -45,16 +45,23 @@ fails the build. That is deliberate.
 
 ## 3. Tests
 
-**The test tooling is planned but not yet installed.** `docs/implementation/phase-0-foundation-scaffold.md`
-locks the choice; treat these as the target, and say plainly that a tier is not wired up yet
-rather than inventing a command that does not run.
+**The test tooling is installed and running.** `pnpm test` runs the Vitest suites across
+`packages/shared`, `apps/api` and `apps/web`; `pnpm e2e` runs the Playwright offline suite
+against the production build.
 
-| Tier                | Tool       | Location (planned)          | Needs                    |
-|---------------------|------------|------------------------------|--------------------------|
-| Unit                | Vitest     | beside the source, `*.test.ts` | Nothing                |
-| End to end          | Playwright | `apps/web/tests/e2e/`        | A running dev or preview server |
-| Offline end to end  | Playwright | `apps/web/tests/e2e/`        | Same, with the offline harness |
-| API                 | supertest  | `apps/api/test/`             | The NestJS app, Phase 1 onward |
+| Tier               | Location                              | Needs             |
+|--------------------|---------------------------------------|-------------------|
+| Domain unit        | `packages/shared/test/`               | Nothing           |
+| Conflict rules     | `apps/api/test/conflict.test.ts`      | Nothing           |
+| Client durability  | `apps/web/src/lib/__tests__/`         | Nothing           |
+| Live hub           | `apps/api/test/*-integration.test.ts` | Hub plus Postgres |
+| Protocol smoke     | `apps/api/test/e2e-sync.sh`           | Hub plus Postgres |
+| Offline end to end | `apps/web/e2e/`                       | Built PWA on 4173 |
+
+The live-hub suites **skip themselves** when no hub answers, so `pnpm test` runs with no
+infrastructure. The Playwright suite runs against the **production build**, never the dev
+server: offline behaviour comes from the service worker, which only exists after
+`vite build`.
 
 **The offline harness is mandatory infrastructure**, not a nice-to-have. Definition of Done
 item 3 in `docs/implementation/README.md` requires an offline end-to-end test for any clinic

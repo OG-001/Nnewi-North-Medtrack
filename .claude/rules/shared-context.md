@@ -29,13 +29,14 @@ It holds real patient health data. Under the Nigeria Data Protection Act 2023 th
 | Local store      | Dexie 4 over IndexedDB, plus `dexie-react-hooks`              |
 | Offline shell    | `vite-plugin-pwa` and `workbox-window` service worker         |
 | Validation       | Zod on the client, class-validator or Zod in the future API   |
-| Backend (planned)| NestJS, modular monolith, REST under `/api/v1`                |
-| Database (planned)| PostgreSQL 16, with Redis 7 and BullMQ for background jobs   |
+| Backend          | NestJS, modular monolith, REST under `/api/v1`                |
+| Database         | PostgreSQL 16 via Prisma; Redis 7 present, BullMQ not yet used|
 | Packaging        | pnpm 9 workspaces, Node 20 or newer                           |
 | Container        | Docker and Docker Compose, nginx serving the built PWA        |
 
-The `apps/api/` NestJS hub **does not exist yet**. `infra/docker-compose.yml` already starts
-`postgres` and `redis` ready for it, and the `api` service is a commented placeholder.
+The `apps/api/` NestJS hub is built and runs under `infra/docker-compose.yml` as the `api`
+service. Redis is started for the background jobs Phase 7 will eventually move onto a queue;
+the reminder scan currently runs on an interval inside the hub process.
 
 ---
 
@@ -87,17 +88,24 @@ maternal and antenatal care, immunization, queue, NHMIS reporting with DHIS2 and
 export, the admin screens, RBAC, offline persistence with an outbox and audit trail, the
 installable PWA shell, and the dark-green theme.
 
-**Not built, deferred by the plan:** the NestJS and PostgreSQL sync hub, server-side scope
-enforcement, live SMS dispatch, and production hardening.
+**Working today, in `apps/api/`:** facility-scoped authentication, the sync protocol
+(enrol, push, pull, baseline) with per-entity-class conflict resolution and an admin
+conflict queue, server-side facility-scope enforcement, and the SMS module with two
+provider adapters, editable bilingual templates, the consent gate and a send log.
+
+**Not built, deferred by the plan:** production hardening and the pilot release (Phase 10),
+the server-side reporting projection, and an offline queue for SMS composed while
+disconnected. No SMS provider sandbox has been exercised.
 
 Two demo facilities are provisioned in `apps/web/src/db/seed.ts`: Primary Health Centre
 Umuenem Otolo Nnewi (`04/14/1/1/0062`) and Obiagu Health Post, Uruagu, Nnewi
 (`04/14/1/1/0060`). Demo logins are listed in `RUNNING.md`. Every other facility opens empty
 until an admin provisions staff.
 
-**Never describe a deferred capability as if it works.** The most common way to mislead the
-owner on this project is to report the third isolation layer (server-side sync scope) as
-enforced when only the first two are.
+**Never describe a deferred capability as if it works, and never describe a built one as
+missing.** Both mislead. The live risks now are claiming SMS has been exercised against a
+real provider (it has not) and claiming the platform is production-ready (Phase 10 is not
+started). Check `devops/change_log/` before stating what exists.
 
 ---
 
@@ -109,12 +117,16 @@ This is the highest-risk correctness surface in the system.
 |--------------------------|----------------------|
 | Scoped authentication    | Enforced now         |
 | Client-side data scope   | Enforced now         |
-| Server-side sync scope   | Deferred to Phase 3  |
+| Server-side sync scope   | Enforced now (hub)   |
 
 Layer 1 lives in `apps/web/src/lib/session.tsx`: an account only signs in at a facility
 listed in its `facility_ids`. Layer 2 lives in `apps/web/src/lib/scope.ts`: every read is
 filtered by the signed-in `facility_id`, and soft-deleted rows never reach the UI. Layer 3
-is the production guarantee and does not exist yet.
+lives in `apps/api/src/sync/sync.service.ts`: a pull naming a facility outside the caller's
+scope returns `OUT_OF_SCOPE`, and a push carrying a foreign `facility_id` is rejected.
+
+Layer 3 is the production guarantee, and it only applies when the PWA is pointed at a
+running hub. A device with no hub configured still relies on layers 1 and 2 alone.
 
 ---
 

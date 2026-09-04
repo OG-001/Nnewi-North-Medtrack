@@ -8,7 +8,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "../../db/db";
 import type { OutboxEntry } from "../../db/types";
-import { getMeta, purgeOutOfScope, recoverInFlight, setWatermark } from "../sync-engine";
+import {
+  applyChangeForTest,
+  getMeta,
+  purgeOutOfScope,
+  recoverInFlight,
+  setWatermark,
+} from "../sync-engine";
 
 async function resetStore() {
   await db.open();
@@ -153,5 +159,127 @@ describe("scope purge", () => {
     // null scope means cross-facility oversight — nothing to purge.
     expect(await purgeOutOfScope(null)).toBe(0);
     expect(await db.patients.count()).toBe(2);
+  });
+});
+
+describe("defensive application of hub rows (regression)", () => {
+  beforeEach(resetStore);
+
+  it("completes a row that arrives without its common columns", async () => {
+    // A partial payload from another device once crashed the patient list,
+    // because the list sorts on created_at. One bad row must not break a screen.
+    await applyChangeForTest({
+      entity_type: "patient",
+      entity_id: "p-partial",
+      op: "upsert",
+      rev: 3,
+      payload: { facility_id: "fac-0062", first_name: "Partial", last_name: "Row" },
+    });
+
+    const row = (await db.patients.get("p-partial")) as unknown as Record<string, unknown>;
+    expect(row).toBeDefined();
+    expect(typeof row.created_at).toBe("string");
+    expect(typeof row.updated_at).toBe("string");
+    expect(row.deleted_at).toBeNull();
+    expect(row.rev).toBe(3);
+    expect(row.facility_id).toBe("fac-0062");
+  });
+
+  it("keeps the existing timestamps when the hub omits them on an update", async () => {
+    await applyChangeForTest({
+      entity_type: "patient",
+      entity_id: "p-keep",
+      op: "upsert",
+      rev: 1,
+      payload: {
+        facility_id: "fac-0062",
+        first_name: "First",
+        last_name: "Version",
+        created_at: "2026-01-01T00:00:00.000Z",
+      },
+    });
+    await applyChangeForTest({
+      entity_type: "patient",
+      entity_id: "p-keep",
+      op: "upsert",
+      rev: 2,
+      payload: { facility_id: "fac-0062", first_name: "Second", last_name: "Version" },
+    });
+
+    const row = (await db.patients.get("p-keep")) as unknown as Record<string, unknown>;
+    expect(row.created_at).toBe("2026-01-01T00:00:00.000Z");
+    expect(row.first_name).toBe("Second");
+  });
+
+  it("ignores a delete for a row it does not hold", async () => {
+    await applyChangeForTest({
+      entity_type: "patient",
+      entity_id: "p-absent",
+      op: "delete",
+      rev: 2,
+      payload: { facility_id: "fac-0062" },
+    });
+    expect(await db.patients.get("p-absent")).toBeUndefined();
+  });
+
+  it("soft-deletes rather than removing a row", async () => {
+    await applyChangeForTest({
+      entity_type: "patient",
+      entity_id: "p-del",
+      op: "upsert",
+      rev: 1,
+      payload: { facility_id: "fac-0062", first_name: "To", last_name: "Delete" },
+    });
+    await applyChangeForTest({
+      entity_type: "patient",
+      entity_id: "p-del",
+      op: "delete",
+      rev: 2,
+      payload: { facility_id: "fac-0062" },
+    });
+
+    const row = (await db.patients.get("p-del")) as unknown as Record<string, unknown>;
+    // Clinical data is never hard-deleted (Global Constraint 3).
+    expect(row).toBeDefined();
+    expect(row.deleted_at).toBeTruthy();
+  });
+});
+
+describe("list fields on applied rows (regression)", () => {
+  beforeEach(resetStore);
+
+  it("defaults the arrays the patient list iterates over", async () => {
+    // A payload without category_tags crashed the Patients screen outright.
+    await applyChangeForTest({
+      entity_type: "patient",
+      entity_id: "p-lists",
+      op: "upsert",
+      rev: 1,
+      payload: { facility_id: "fac-0062", first_name: "No", last_name: "Arrays" },
+    });
+
+    const row = (await db.patients.get("p-lists")) as unknown as Record<string, unknown>;
+    expect(row.category_tags).toEqual([]);
+    expect(row.allergies).toEqual([]);
+    expect(row.chronic_conditions).toEqual([]);
+  });
+
+  it("keeps arrays the hub did send", async () => {
+    await applyChangeForTest({
+      entity_type: "patient",
+      entity_id: "p-lists-2",
+      op: "upsert",
+      rev: 1,
+      payload: {
+        facility_id: "fac-0062",
+        first_name: "Has",
+        last_name: "Arrays",
+        allergies: ["penicillin"],
+      },
+    });
+
+    const row = (await db.patients.get("p-lists-2")) as unknown as Record<string, unknown>;
+    expect(row.allergies).toEqual(["penicillin"]);
+    expect(row.category_tags).toEqual([]);
   });
 });

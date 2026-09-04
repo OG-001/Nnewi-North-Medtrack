@@ -175,6 +175,11 @@ rehearsed restore, readiness and metrics endpoints, a secret scanner, and the ru
 no live alerting, no training, no UAT, no pilot. The controller and DPO are unnamed (Q9), so
 the pilot cannot lawfully begin. SMS has never run against a real provider.
 
+Clinical configuration (the immunization schedule and ANC contact model) is editable through
+the admin UI and hub-authoritative, and cross-facility patient access is reason-prompted and
+audited. Still unbuilt: server-side CRUD for facilities, users and the audit log
+(`api-design.md` section 5), so staff administration remains device-local.
+
 An agent must never describe a deferred capability as if it exists, and must not describe a
 built one as missing. Check `devops/change_log/` for the current position.
 

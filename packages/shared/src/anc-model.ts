@@ -48,8 +48,14 @@ export interface ComputedAncContact {
 export function computeAncSchedule(
   lmp: Date,
   model: AncModel = "who_2016_8",
+  /**
+   * Contact list override. Passed when a facility has edited the ANC model,
+   * which is configuration rather than code (Global Constraint 9). Omitted, the
+   * built-in model for `model` is used.
+   */
+  items?: AncModelItem[],
 ): ComputedAncContact[] {
-  return ANC_MODEL_ITEMS[model].map((it) => {
+  return (items ?? ANC_MODEL_ITEMS[model]).map((it) => {
     const targetDate = addDays(lmp, it.targetGaWeeks * 7);
     return {
       contactNumber: it.contactNumber,

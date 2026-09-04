@@ -10,6 +10,7 @@ import { enroll, purgeOutOfScope } from "./sync-engine";
 import { hubLogin, hubLogout, hubReachable } from "./api";
 import { syncNow } from "./sync";
 import { getDeviceId } from "./device";
+import { loadCachedConfig, refreshConfigFromHub } from "./clinical-config";
 
 /**
  * Try to sign in to the hub and bring the device up to date.
@@ -17,6 +18,11 @@ import { getDeviceId } from "./device";
  * Returns the granted facility scope on success, or null when there is no hub
  * to talk to. Never throws — callers treat it as best-effort.
  */
+/** Load the cached config so an offline device schedules correctly too. */
+export async function primeClinicalConfig(): Promise<void> {
+  await loadCachedConfig();
+}
+
 export async function establishHubSession(
   username: string,
   pin: string,
@@ -30,6 +36,10 @@ export async function establishHubSession(
 
     // Privacy: drop anything the hub did not grant this device (§7, §9).
     await purgeOutOfScope(enrollment.scope);
+
+    // Clinical config is hub-authoritative and flows one way. Pull it before
+    // syncing so any scheduling done this session uses the current schedule.
+    await refreshConfigFromHub();
     await syncNow();
 
     return enrollment.scope;

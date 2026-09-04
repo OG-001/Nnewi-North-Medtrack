@@ -269,3 +269,17 @@ model ReportAdjustment {
   @@index([reportId])
   @@map("report_adjustment")
 }
+
+/// Hub-authoritative clinical configuration: the immunization schedule and the
+/// ANC contact model. Editable so national guidance changes need no release
+/// (Global Constraint 9). Devices read and cache it; they never push edits.
+model AppConfig {
+  key       String   @id
+  value     Json
+  /// Bumped on every save. A device compares it to decide whether to re-fetch.
+  version   Int      @default(1)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("app_config")
+}

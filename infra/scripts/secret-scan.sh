@@ -15,7 +15,7 @@ PATTERNS=(
   'AKIA[0-9A-Z]{16}'
   'sk-[A-Za-z0-9]{32,}'
   '-----BEGIN [A-Z ]*PRIVATE KEY-----'
-  'postgres(ql)?://[^:@/\s]+:[^@/\s]+@'
+  'postgres(ql)?://[^:@/[:space:]]+:[^@/[:space:]]+@'
   'xox[baprs]-[A-Za-z0-9-]{10,}'
 )
 
@@ -29,7 +29,11 @@ while IFS= read -r file; do
       # Drop lines that are obviously placeholders rather than credentials.
       # A template SHOULD contain a connection-string shape; what must never
       # appear is a working value in it.
+      # Placeholders and variable interpolation are not credentials. A template
+      # SHOULD show the shape of a connection string; what must never appear is
+      # a working value in it.
       matches=$(echo "$matches" | grep -vEi 'CHANGE_ME|YOUR_|REPLACE_ME|<[a-z_]+>|EXAMPLE|xxxx' || true)
+      matches=$(echo "$matches" | grep -vE '\$\{[A-Za-z_]|\$[A-Z_]{3,}' || true)
       [ -z "$matches" ] && continue
 
       # The development compose credentials are documented and intentional.

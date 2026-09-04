@@ -176,20 +176,81 @@ async function pushBatch(): Promise<PushOutcome & { remaining: boolean }> {
   return { pushed: pending.length, conflicts, rejected, remaining: stillPending > 0 };
 }
 
-/** Apply one hub change to the local store. Hub rows win over local copies. */
+/**
+ * List-valued fields the UI iterates over, per entity type. A row arriving
+ * without one of these crashes the screen that renders it, so they are defaulted
+ * to an empty list on the way in rather than guarded at every call site.
+ */
+const REQUIRED_LIST_FIELDS: Record<string, string[]> = {
+  patient: ["category_tags", "allergies", "chronic_conditions"],
+  encounter: [],
+  anc_visit: ["danger_signs"],
+  pregnancy: ["risk_flags"],
+};
+
+/**
+ * The columns every local row must carry for the UI to be able to render it
+ * (data-model section 2). A row missing one of these is not merely incomplete:
+ * screens sort and filter on them, so a single bad row can break a whole page.
+ */
+function withRequiredColumns(
+  change: SyncChange,
+  payload: Record<string, unknown>,
+  existing: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const now = new Date().toISOString();
+  const lists: Record<string, unknown> = {};
+  for (const field of REQUIRED_LIST_FIELDS[change.entity_type] ?? []) {
+    lists[field] = Array.isArray(payload[field])
+      ? payload[field]
+      : (existing?.[field] as unknown[] | undefined) ?? [];
+  }
+
+  return {
+    ...payload,
+    ...lists,
+    id: change.entity_id,
+    facility_id: payload.facility_id ?? existing?.facility_id ?? "",
+    created_at: payload.created_at ?? existing?.created_at ?? now,
+    created_by: payload.created_by ?? existing?.created_by ?? "hub",
+    updated_at: payload.updated_at ?? existing?.updated_at ?? now,
+    updated_by: payload.updated_by ?? existing?.updated_by ?? "hub",
+    rev: payload.rev ?? change.rev ?? 1,
+    deleted_at: payload.deleted_at ?? null,
+    origin_device_id: payload.origin_device_id ?? existing?.origin_device_id ?? "hub",
+  };
+}
+
+/**
+ * Apply one hub change to the local store. Hub rows win over local copies.
+ *
+ * Payloads are defended rather than trusted: another device on an older build,
+ * or a partial row, must not be able to brick a clinic screen. A row that
+ * arrives without its common columns is completed here instead of being written
+ * in a shape the UI cannot handle.
+ */
+export async function applyChangeForTest(change: SyncChange): Promise<void> {
+  return applyChange(change);
+}
+
 async function applyChange(change: SyncChange): Promise<void> {
   const tableName = TABLE_BY_ENTITY_TYPE[change.entity_type];
   if (!tableName || !change.payload) return;
   const table = db.table(tableName);
+  const payload = change.payload as Record<string, unknown>;
+
+  const existing = (await table.get(change.entity_id)) as Record<string, unknown> | undefined;
 
   if (change.op === "delete") {
-    const existing = await table.get(change.entity_id);
-    if (existing) {
-      await table.put({ ...existing, ...change.payload, deleted_at: new Date().toISOString() });
-    }
+    if (!existing) return;
+    await table.put({
+      ...withRequiredColumns(change, { ...existing, ...payload }, existing),
+      deleted_at: new Date().toISOString(),
+    });
     return;
   }
-  await table.put({ ...change.payload, id: change.entity_id });
+
+  await table.put(withRequiredColumns(change, payload, existing));
 }
 
 /** Pull one page of changes, advancing the watermark as they land (§3.1). */

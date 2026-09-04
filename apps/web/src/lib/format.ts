@@ -1,16 +1,32 @@
+/**
+ * Display helpers.
+ *
+ * These are deliberately tolerant of missing fields. They render rows that came
+ * from another device, and a record that arrives incomplete must degrade to a
+ * dash rather than throwing: one bad row should never blank an entire clinic
+ * screen. The names are typed as optional for the same reason.
+ */
 import { ageLabel, parseISODate } from "@phc/shared";
 
-export function fullName(p: { first_name: string; last_name: string; other_names?: string }): string {
-  return [p.last_name, p.first_name, p.other_names].filter(Boolean).join(" ");
+interface NameParts {
+  first_name?: string | null;
+  last_name?: string | null;
+  other_names?: string | null;
 }
 
-export function displayName(p: { first_name: string; last_name: string }): string {
-  return `${p.first_name} ${p.last_name}`;
+export function fullName(p: NameParts): string {
+  return [p.last_name, p.first_name, p.other_names].filter(Boolean).join(" ") || "Unnamed record";
 }
 
-export function patientAge(dob: string | null): string {
+export function displayName(p: NameParts): string {
+  return [p.first_name, p.last_name].filter(Boolean).join(" ") || "Unnamed record";
+}
+
+export function patientAge(dob: string | null | undefined): string {
   if (!dob) return "—";
-  return ageLabel(parseISODate(dob));
+  const parsed = parseISODate(dob);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return ageLabel(parsed);
 }
 
 export function formatDate(iso: string | null | undefined): string {
@@ -41,10 +57,12 @@ export function relativeTime(iso: string | null | undefined): string {
   return `${Math.round(hrs / 24)} d ago`;
 }
 
-export function initials(p: { first_name: string; last_name: string }): string {
-  return `${p.first_name[0] ?? ""}${p.last_name[0] ?? ""}`.toUpperCase();
+export function initials(p: NameParts): string {
+  const value = `${p.first_name?.[0] ?? ""}${p.last_name?.[0] ?? ""}`.toUpperCase();
+  return value || "?";
 }
 
-export function titleCase(s: string): string {
+export function titleCase(s: string | null | undefined): string {
+  if (!s) return "—";
   return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }

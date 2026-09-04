@@ -67,6 +67,7 @@ async function head(): Promise<number> {
   let since = 0;
   for (;;) {
     const res = await api(`/sync/changes?since=${since}&limit=500`);
+    expect(res.ok, `GET /sync/changes returned ${res.status}`).toBe(true);
     const body = (await res.json()) as ChangesBody;
     since = body.next_seq;
     if (!body.has_more) return since;
@@ -82,6 +83,11 @@ async function drainFrom(since: number, pageSize: number): Promise<ChangeRow[]> 
     pages += 1;
     expect(pages).toBeLessThan(5_000); // never spin forever on a bad watermark
     const res = await api(`/sync/changes?since=${cursor}&limit=${pageSize}`);
+    // Surface the real reason. A 429 here means the hub's rate limit is lower
+    // than the suite needs, which is a test-environment problem, not a sync bug.
+    expect(res.ok, `GET /sync/changes returned ${res.status}: ${await res.clone().text()}`).toBe(
+      true,
+    );
     const body = (await res.json()) as ChangesBody;
     collected.push(...body.changes);
     expect(body.next_seq).toBeGreaterThanOrEqual(cursor);

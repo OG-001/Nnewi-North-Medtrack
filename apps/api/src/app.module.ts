@@ -9,14 +9,23 @@ import { SystemModule } from "./system/system.module";
 import { AdminModule } from "./admin/admin.module";
 import { SmsModule } from "./sms/sms.module";
 import { ReportsModule } from "./reports/reports.module";
+import { ClinicalConfigModule } from "./config/config.module";
+import { PatientsModule } from "./patients/patients.module";
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
 import { RolesGuard } from "./common/guards/roles.guard";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    // Rate limiting on auth and sync (api-design §7).
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    // Rate limiting (api-design section 7). Configurable, because the right
+    // limit differs by deployment: a busy PHC syncing several devices needs
+    // more headroom than the default, and a test run needs far more again.
+    ThrottlerModule.forRoot([
+      {
+        ttl: Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60_000),
+        limit: Number(process.env.RATE_LIMIT_PER_WINDOW ?? 120),
+      },
+    ]),
     PrismaModule,
     AuthModule,
     SyncModule,
@@ -24,6 +33,8 @@ import { RolesGuard } from "./common/guards/roles.guard";
     AdminModule,
     SmsModule,
     ReportsModule,
+    ClinicalConfigModule,
+    PatientsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -1,9 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
-  ANC_MODEL_ITEMS,
-  ANC_MODEL_LABELS,
-  DEFAULT_EPI_SCHEDULE,
   ROLE_LABELS,
   newId,
   nationalFacilityCode,
@@ -13,6 +10,7 @@ import {
 } from "@phc/shared";
 import { db } from "../db/db";
 import { SmsAdmin } from "../components/SmsAdmin";
+import { ScheduleEditor } from "../components/ScheduleEditor";
 import { createRecord, saveRecord } from "../db/repository";
 import { useSession } from "../lib/session";
 import { getDeviceId } from "../lib/device";
@@ -213,57 +211,9 @@ function StaffTab() {
 }
 
 function ConfigTab() {
-  return (
-    <div className="space-y-5">
-      <div className="card p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-700">Immunization (EPI) schedule</h3>
-          <Badge tone="amber">verify vs. current NPHCDA (Q2)</Badge>
-        </div>
-        <div className="overflow-hidden rounded-lg border border-slate-200">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-3 py-2 text-left">Dose</th>
-                <th className="px-3 py-2 text-left">Antigen</th>
-                <th className="px-3 py-2 text-left">Recommended age</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {DEFAULT_EPI_SCHEDULE.items.map((it) => (
-                <tr key={it.id}>
-                  <td className="px-3 py-1.5 font-medium text-slate-700">{it.doseLabel}</td>
-                  <td className="px-3 py-1.5 uppercase text-slate-500">{it.antigen}</td>
-                  <td className="px-3 py-1.5 text-slate-600">{ageDescriptor(it.recommendedAgeDays)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="card p-4">
-        <h3 className="mb-3 text-sm font-semibold text-slate-700">ANC models (Q3)</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {Object.entries(ANC_MODEL_ITEMS).map(([model, items]) => (
-            <div key={model} className="rounded-lg border border-slate-200 p-3">
-              <div className="mb-1 text-sm font-medium text-slate-700">{ANC_MODEL_LABELS[model as keyof typeof ANC_MODEL_LABELS]}</div>
-              <div className="text-xs text-slate-500">
-                Contacts at GA weeks: {items.map((i) => i.targetGaWeeks).join(", ")}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <p className="rounded-lg bg-brand-50 px-4 py-3 text-xs text-brand-800">
-        Schedules &amp; SMS templates are <strong>config, not code</strong> (master-plan §7.7). Full in-app
-        editing with versioning ships in Phase 9; the engines already read from this config.
-      </p>
-    </div>
-  );
+  const { can } = useSession();
+  return <ScheduleEditor canEdit={can("schedule.edit")} />;
 }
-
 function AuditTab() {
   const events = useLiveQuery(
     () => db.auditEvents.orderBy("at").reverse().limit(100).toArray(),
@@ -336,11 +286,4 @@ function HealthTab() {
       </div>
     </div>
   );
-}
-
-function ageDescriptor(days: number): string {
-  if (days === 0) return "At birth";
-  if (days % 7 === 0 && days < 200) return `${days / 7} weeks`;
-  const months = Math.round(days / 30.44);
-  return `${months} months`;
 }

@@ -182,10 +182,18 @@ pnpm test:all                      # both of the above
 bash apps/api/test/e2e-sync.sh     # protocol tests against a running hub (18)
 ```
 
-`pnpm test` runs with or without infrastructure: the live-hub tests (resumable
-pull, replay, poison isolation, baseline volume/perf) skip themselves when no
-hub answers, and the 21 conflict-resolution tests plus 7 client durability tests
-always run.
+`pnpm test` runs with or without infrastructure: the live-hub tests skip
+themselves when no hub answers, and the pure unit tests always run.
+
+> **Running the live-hub tests:** start the hub with a raised rate limit, or the
+> suite trips the API's own limiter and fails with confusing errors:
+>
+> ```bash
+> RATE_LIMIT_PER_WINDOW=100000 pnpm dev:api
+> ```
+>
+> The suite makes far more than 120 requests a minute. The limit is deliberately
+> low by default because that is right for a clinic, not for a test run.
 
 The browser tests run against the **production build**, not the dev server: the
 offline guarantee comes from the PWA service worker, which only exists after

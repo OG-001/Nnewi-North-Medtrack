@@ -6,6 +6,7 @@ import { useScope, notDeleted } from "../lib/scope";
 import { useSession } from "../lib/session";
 import { PageHeader, Modal, Badge, EmptyState, Avatar } from "../components/ui";
 import { PatientForm } from "../components/PatientForm";
+import { LgaPatientSearch } from "../components/LgaPatientSearch";
 import { IconPlus, IconSearch, IconPhone } from "../components/icons";
 import { displayName, patientAge, initials, titleCase } from "../lib/format";
 import type { Patient } from "../db/types";
@@ -24,14 +25,16 @@ export function PatientsPage() {
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     const list = q
-      ? inScope.filter(
-          (p) =>
-            p.phone_primary.toLowerCase().includes(q) ||
-            displayName(p).toLowerCase().includes(q) ||
-            p.mrn.toLowerCase().includes(q),
+      ? inScope.filter((p) =>
+          // Fields are read defensively: a row synced from another device may
+          // be missing one, and search must not crash the screen.
+          [p.phone_primary, displayName(p), p.mrn]
+            .some((field) => (field ?? "").toLowerCase().includes(q)),
         )
       : inScope;
-    return [...list].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    // Newest first, tolerating a row whose timestamp did not survive a sync:
+    // a patient list must never fail to render because of one bad row.
+    return [...list].sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
   }, [inScope, query]);
 
   function open(p: Patient) {
@@ -63,6 +66,13 @@ export function PatientsPage() {
         />
       </div>
 
+      {/* Continuity of care: a patient registered at another PHC in the LGA.
+          Deliberately a separate action rather than widening the search above,
+          and opening such a record is reason-prompted and audited. */}
+      <div className="mb-4 flex justify-end">
+        <LgaPatientSearch initialQuery={query} />
+      </div>
+
       {results.length === 0 ? (
         <EmptyState
           title={query ? "No matching patients" : "No patients yet"}
@@ -87,7 +97,7 @@ export function PatientsPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-semibold text-slate-800">{displayName(p)}</span>
-                  {p.category_tags.map((t) => (
+                  {(p.category_tags ?? []).map((t) => (
                     <Badge key={t} tone="green">
                       {titleCase(t)}
                     </Badge>

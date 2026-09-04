@@ -28,7 +28,7 @@ import type { Actor } from "../db/repository";
 import type { UserAccount } from "../db/types";
 import { newId } from "@phc/shared";
 import { getDeviceId } from "./device";
-import { endHubSession, establishHubSession } from "./hub-session";
+import { endHubSession, establishHubSession, primeClinicalConfig } from "./hub-session";
 
 interface SessionValue {
   user: UserAccount | null;
@@ -60,6 +60,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     (async () => {
+      // Load the cached clinical schedule first: an offline device must still
+      // schedule against the configured schedule, not only the built-in one.
+      await primeClinicalConfig();
+
       const savedSelected = localStorage.getItem(LS_SELECTED_FAC);
       if (savedSelected) {
         const f = await db.facilities.get(savedSelected);

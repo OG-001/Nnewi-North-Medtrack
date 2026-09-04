@@ -11,6 +11,7 @@ import {
   type AncModel,
 } from "@phc/shared";
 import { db } from "../db/db";
+import { getAncModelConfig } from "../lib/clinical-config";
 import { createRecord, saveRecord } from "../db/repository";
 import { useSession } from "../lib/session";
 import type { AncScheduleItem, Patient, Pregnancy } from "../db/types";
@@ -35,19 +36,24 @@ export function StartPregnancyModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The ANC contact model is configuration, editable by an admin (Constraint 9).
+  // The override applies only when the saved config is for the chosen model.
+  const ancConfig = getAncModelConfig();
+  const configuredItems = ancConfig.model === model ? ancConfig.items : undefined;
+
   const preview = useMemo(() => {
     if (!lmp) return null;
     const lmpDate = parseISODate(lmp);
     const edd = computeEdd(lmpDate);
     const ga = gestationalAgeWeeks(lmpDate);
-    const contacts = computeAncSchedule(lmpDate, model);
+    const contacts = computeAncSchedule(lmpDate, model, configuredItems);
     const risk = computeRiskFlags({
       ageYears: patient.date_of_birth ? ageYears(parseISODate(patient.date_of_birth)) : undefined,
       para: para ? Number(para) : undefined,
       previousCs,
     });
     return { edd, ga, contacts, risk };
-  }, [lmp, model, para, previousCs, patient.date_of_birth]);
+  }, [lmp, model, para, previousCs, patient.date_of_birth, configuredItems]);
 
   async function save() {
     setError(null);
@@ -72,7 +78,7 @@ export function StartPregnancyModal({
       await saveRecord(db.pregnancies, pregnancy, actor, "create");
 
       // Generate ANC schedule items from the chosen model.
-      for (const c of computeAncSchedule(lmpDate, model)) {
+      for (const c of computeAncSchedule(lmpDate, model, configuredItems)) {
         const item = createRecord<AncScheduleItem>(actor, {
           pregnancy_id: pregnancy.id,
           patient_id: patient.id,

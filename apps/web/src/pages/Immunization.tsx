@@ -8,6 +8,7 @@ import {
   toISODate,
 } from "@phc/shared";
 import { db } from "../db/db";
+import { getImmunizationSchedule } from "../lib/clinical-config";
 import { SendReminderButton } from "../components/SendReminderButton";
 import { createRecord, saveRecord } from "../db/repository";
 import { useSession } from "../lib/session";
@@ -20,6 +21,8 @@ import type { ImmunizationDose, Patient } from "../db/types";
 export function ImmunizationPage() {
   const { actor } = useSession();
   const scope = useScope();
+  // The active schedule is configuration, editable by an admin (Constraint 9).
+  const schedule = getImmunizationSchedule();
   const today = toISODate(new Date());
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -56,7 +59,7 @@ export function ImmunizationPage() {
 
   async function generateSchedule(child: Patient) {
     if (!actor || !child.date_of_birth) return;
-    for (const d of computeChildSchedule(parseISODate(child.date_of_birth))) {
+    for (const d of computeChildSchedule(parseISODate(child.date_of_birth), schedule)) {
       const due = toISODate(d.dueDate);
       const dose = createRecord<ImmunizationDose>(actor, {
         patient_id: child.id,

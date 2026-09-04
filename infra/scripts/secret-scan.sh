@@ -32,7 +32,7 @@ while IFS= read -r file; do
       # Placeholders and variable interpolation are not credentials. A template
       # SHOULD show the shape of a connection string; what must never appear is
       # a working value in it.
-      matches=$(echo "$matches" | grep -vEi 'CHANGE_ME|YOUR_|REPLACE_ME|<[a-z_]+>|EXAMPLE|xxxx' || true)
+      matches=$(echo "$matches" | grep -vEi 'CHANGE_ME|YOUR_|REPLACE_ME|<[a-z_]+>|EXAMPLE|xxxx|user:password|username:password|user:pass@' || true)
       matches=$(echo "$matches" | grep -vE '\$\{[A-Za-z_]|\$[A-Z_]{3,}' || true)
       [ -z "$matches" ] && continue
 

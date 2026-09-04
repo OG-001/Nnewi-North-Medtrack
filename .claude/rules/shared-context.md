@@ -90,8 +90,10 @@ installable PWA shell, and the dark-green theme.
 
 **Working today, in `apps/api/`:** facility-scoped authentication, the sync protocol
 (enrol, push, pull, baseline) with per-entity-class conflict resolution and an admin
-conflict queue, server-side facility-scope enforcement, and the SMS module with two
-provider adapters, editable bilingual templates, the consent gate and a send log.
+conflict queue, server-side facility-scope enforcement, the SMS module with two provider
+adapters, NHMIS reporting with lock and LGA rollup, hub-authoritative clinical config, the
+LGA-wide patient index with audited cross-facility access, and staff, facility and audit
+administration.
 
 **Not built, deferred by the plan:** production hardening and the pilot release (Phase 10),
 the server-side reporting projection, and an offline queue for SMS composed while

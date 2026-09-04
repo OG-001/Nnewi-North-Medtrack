@@ -1,8 +1,6 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
-  ROLE_LABELS,
-  newId,
   nationalFacilityCode,
   shortFacilityCode,
   facilityArea,
@@ -10,13 +8,15 @@ import {
 } from "@phc/shared";
 import { db } from "../db/db";
 import { SmsAdmin } from "../components/SmsAdmin";
+import { StaffAdmin } from "../components/StaffAdmin";
+import { AuditLog } from "../components/AuditLog";
 import { ScheduleEditor } from "../components/ScheduleEditor";
 import { createRecord, saveRecord } from "../db/repository";
 import { useSession } from "../lib/session";
 import { getDeviceId } from "../lib/device";
 import { useSync } from "../lib/sync";
 import { Badge, Field, Modal, PageHeader, StatCard } from "../components/ui";
-import { formatDateTime, relativeTime, titleCase } from "../lib/format";
+import { relativeTime } from "../lib/format";
 import type { Facility } from "../db/types";
 
 type Tab = { key: string; label: string; perm: Permission };
@@ -163,101 +163,15 @@ function FacilitiesTab() {
 }
 
 function StaffTab() {
-  const { user } = useSession();
-  const users = useLiveQuery(() => db.users.toArray(), [], []);
-
-  async function toggle(id: string, status: "active" | "disabled") {
-    await db.users.update(id, { status, updated_at: new Date().toISOString() });
-    await db.auditEvents.add({
-      id: newId(),
-      actor_user_id: user?.id ?? "system",
-      action: "permission_change",
-      entity_type: "user_account",
-      entity_id: id,
-      facility_id: user?.facility_ids[0] ?? "",
-      at: new Date().toISOString(),
-      details: { status },
-      device_id: getDeviceId(),
-    });
-  }
-
-  return (
-    <div className="card divide-y divide-slate-100">
-      {users.map((u) => (
-        <div key={u.id} className="flex items-center justify-between px-4 py-3">
-          <div>
-            <div className="font-semibold text-slate-800">{u.full_name}</div>
-            <div className="text-xs text-slate-400">
-              @{u.username} · {u.roles.map((r) => ROLE_LABELS[r]).join(", ")}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge tone={u.status === "active" ? "green" : u.status === "disabled" ? "red" : "amber"}>
-              {u.status}
-            </Badge>
-            {u.id !== user?.id && (
-              <button
-                className="btn-secondary !px-2 !py-1 text-xs"
-                onClick={() => toggle(u.id, u.status === "active" ? "disabled" : "active")}
-              >
-                {u.status === "active" ? "Disable" : "Activate"}
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  return <StaffAdmin />;
 }
-
 function ConfigTab() {
   const { can } = useSession();
   return <ScheduleEditor canEdit={can("schedule.edit")} />;
 }
 function AuditTab() {
-  const events = useLiveQuery(
-    () => db.auditEvents.orderBy("at").reverse().limit(100).toArray(),
-    [],
-    [],
-  );
-  const users = useLiveQuery(() => db.users.toArray(), [], []);
-  const userName = useMemo(() => new Map(users.map((u) => [u.id, u.full_name])), [users]);
-
-  return (
-    <div className="card overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-          <tr>
-            <th className="px-3 py-2 text-left">When</th>
-            <th className="px-3 py-2 text-left">Actor</th>
-            <th className="px-3 py-2 text-left">Action</th>
-            <th className="px-3 py-2 text-left">Entity</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {events.map((e) => (
-            <tr key={e.id}>
-              <td className="px-3 py-2 text-slate-500">{formatDateTime(e.at)}</td>
-              <td className="px-3 py-2 text-slate-700">{userName.get(e.actor_user_id) ?? e.actor_user_id}</td>
-              <td className="px-3 py-2">
-                <Badge tone={e.action === "delete" ? "red" : e.action === "login" ? "blue" : "slate"}>
-                  {titleCase(e.action)}
-                </Badge>
-              </td>
-              <td className="px-3 py-2 text-slate-500">{e.entity_type}</td>
-            </tr>
-          ))}
-          {events.length === 0 && (
-            <tr>
-              <td colSpan={4} className="px-3 py-8 text-center text-slate-400">No audit events yet.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
+  return <AuditLog />;
 }
-
 function HealthTab() {
   const sync = useSync();
   const outboxTotal = useLiveQuery(() => db.outbox.count(), [], 0);

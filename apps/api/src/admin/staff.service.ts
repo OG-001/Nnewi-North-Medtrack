@@ -42,6 +42,29 @@ export class StaffService {
     }
   }
 
+  /**
+   * A facility administrator may not administer a user who holds a
+   * cross-facility role, even one attached to their own facility.
+   *
+   * Without this, administration is a privilege-escalation path rather than a
+   * scope-limited one: reset an LGA officer's PIN, sign in as them, and read
+   * every facility in the LGA. Checking facility overlap alone is not enough,
+   * because an M&E officer may legitimately be based at a single PHC.
+   *
+   * The rule is about the target's privileges, not their job title. A facility
+   * administrator managing another facility administrator is lateral: same
+   * scope, same powers, no escalation.
+   */
+  private assertMayAdministerUser(principal: Principal, target: { roles: string[] }) {
+    if (this.isSystemAdmin(principal)) return;
+    const elevated = (target.roles as Role[]).filter((r) => ELEVATED_ROLES.includes(r));
+    if (elevated.length) {
+      throw ApiError.forbidden(
+        `Only a system administrator may administer an account holding: ${elevated.join(", ")}`,
+      );
+    }
+  }
+
   /** Only a system admin may grant a role that reads across facilities. */
   private assertMayGrantRoles(principal: Principal, roles: Role[]) {
     if (this.isSystemAdmin(principal)) return;
@@ -94,7 +117,15 @@ export class StaffService {
       orderBy: { fullName: "asc" },
       take: 500,
     });
-    return users.map((u) => this.present(u));
+
+    // A facility administrator sees only the accounts they can actually act on.
+    // Listing an LGA officer they cannot touch produces a confusing 403 and
+    // advertises an account worth attacking.
+    const visible = this.isSystemAdmin(principal)
+      ? users
+      : users.filter((u) => !(u.roles as Role[]).some((r) => ELEVATED_ROLES.includes(r)));
+
+    return visible.map((u) => this.present(u));
   }
 
   async create(principal: Principal, dto: CreateUserDto) {
@@ -153,6 +184,7 @@ export class StaffService {
       principal,
       existing.facilities.map((f) => f.facilityId),
     );
+    this.assertMayAdministerUser(principal, existing);
     if (dto.roles) this.assertMayGrantRoles(principal, dto.roles as Role[]);
     if (dto.facility_ids) this.assertMayAdministerFacilities(principal, dto.facility_ids);
 
@@ -227,6 +259,7 @@ export class StaffService {
       principal,
       existing.facilities.map((f) => f.facilityId),
     );
+    this.assertMayAdministerUser(principal, existing);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({ where: { id: userId }, data: { pinHash: await argon2.hash(pin) } });

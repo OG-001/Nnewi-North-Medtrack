@@ -342,3 +342,127 @@ describe.skipIf(!hubUp)("audit log viewer", () => {
     expect(actions.every((a) => a.count > 0)).toBe(true);
   });
 });
+
+describe.skipIf(!hubUp)("privilege escalation through staff administration", () => {
+  /**
+   * The hole this covers was real, not theoretical.
+   *
+   * A facility administrator could reset the PIN of an lga_authority officer
+   * based at their own PHC, sign in as them, and read every facility in the
+   * LGA. Facility overlap alone did not catch it: an M&E officer may legitimately
+   * be attached to a single site, and then the overlap is complete.
+   *
+   * The boundary is the target's privileges, not their facilities.
+   */
+  let singleSiteOfficerId = "";
+
+  beforeAll(async () => {
+    if (!hubUp) return;
+    const res = await api(
+      "/admin/staff",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          full_name: "Single Site Officer",
+          username: uname("mesite"),
+          pin: "7314",
+          roles: ["lga_authority"],
+          facility_ids: [FACILITY_A],
+        }),
+      },
+      systemAdmin,
+    );
+    singleSiteOfficerId = ((await res.json()) as { id: string }).id;
+  }, 30_000);
+
+  it("refuses a facility admin resetting a cross-facility account's PIN", async () => {
+    const res = await api(`/admin/staff/${singleSiteOfficerId}/reset-pin`, {
+      method: "POST",
+      body: JSON.stringify({ pin: "9137" }),
+    });
+    expect(res.status).toBe(403);
+
+    // And the original PIN still works, so nothing was half-applied.
+    expect((await login(uname("mesite"), "7314")).ok).toBe(true);
+  });
+
+  it("refuses a facility admin disabling a cross-facility account", async () => {
+    const res = await api(`/admin/staff/${singleSiteOfficerId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "disabled" }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("refuses a facility admin stripping roles from a cross-facility account", async () => {
+    const res = await api(`/admin/staff/${singleSiteOfficerId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ roles: ["records_clerk"] }),
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it("hides cross-facility accounts from a facility admin's staff list", async () => {
+    const staff = (await (await api("/admin/staff")).json()) as { roles: string[] }[];
+    for (const member of staff) {
+      expect(member.roles).not.toContain("lga_authority");
+      expect(member.roles).not.toContain("system_admin");
+    }
+  });
+
+  it("still lets a system admin administer that account", async () => {
+    const res = await api(
+      `/admin/staff/${singleSiteOfficerId}/reset-pin`,
+      { method: "POST", body: JSON.stringify({ pin: "7315" }) },
+      systemAdmin,
+    );
+    expect(res.ok).toBe(true);
+    expect((await login(uname("mesite"), "7315")).ok).toBe(true);
+  });
+
+  it("still lets a facility admin administer ordinary facility staff", async () => {
+    // The fix must not make a facility administrator useless: the whole point
+    // is that they run their own PHC's staff.
+    const created = (await (
+      await api("/admin/staff", {
+        method: "POST",
+        body: JSON.stringify({
+          full_name: "Ordinary Nurse",
+          username: uname("ordinary"),
+          pin: "7316",
+          roles: ["nurse_midwife"],
+          facility_ids: [FACILITY_A],
+        }),
+      })
+    ).json()) as { id: string };
+
+    const reset = await api(`/admin/staff/${created.id}/reset-pin`, {
+      method: "POST",
+      body: JSON.stringify({ pin: "7317" }),
+    });
+    expect(reset.ok).toBe(true);
+  });
+
+  it("still lets a facility admin administer another facility administrator", async () => {
+    // Lateral, not vertical: same scope, same powers. Requiring a system admin
+    // here would strand a PHC whose only administrator is locked out.
+    const peer = (await (
+      await api("/admin/staff", {
+        method: "POST",
+        body: JSON.stringify({
+          full_name: "Peer Administrator",
+          username: uname("peeradmin"),
+          pin: "7318",
+          roles: ["facility_admin"],
+          facility_ids: [FACILITY_A],
+        }),
+      })
+    ).json()) as { id: string };
+
+    const reset = await api(`/admin/staff/${peer.id}/reset-pin`, {
+      method: "POST",
+      body: JSON.stringify({ pin: "7319" }),
+    });
+    expect(reset.ok).toBe(true);
+  });
+});

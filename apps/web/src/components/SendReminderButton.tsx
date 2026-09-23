@@ -6,6 +6,7 @@
  * enforced. This button reports what the hub decided, including a refusal, so a
  * health worker is never left thinking a message went out when it did not.
  */
+import { smsEnabled } from "../lib/deployment";
 import { useState } from "react";
 import type { Patient } from "../db/types";
 import { sendReminder, smsAvailable } from "../lib/sms-api";
@@ -40,6 +41,11 @@ export function SendReminderButton({
   const [outcome, setOutcome] = useState<Outcome>({ kind: "idle" });
   // Fixed for this button instance, so a double click cannot send twice.
   const [messageId] = useState(() => newId());
+
+  // After the hooks, so the hook order is identical on every render. SMS is off
+  // for this deployment, so there is nothing to offer. Checked here rather than
+  // at every call site, so no screen can surface a dead button.
+  if (!smsEnabled()) return null;
 
   if (!patient || !can("sms.send")) return null;
 

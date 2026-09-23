@@ -8,6 +8,7 @@ import {
   Put,
   Query,
   Req,
+  UseGuards,
 } from "@nestjs/common";
 import type { Request } from "express";
 import { SmsService } from "./sms.service";
@@ -20,6 +21,7 @@ import {
   type UpdateTemplateDto,
 } from "./sms.dto";
 import { ZodValidationPipe } from "../common/zod.pipe";
+import { SmsEnabledGuard } from "./sms-enabled.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { Public, Roles } from "../common/decorators/roles.decorator";
 import type { Principal } from "../common/principal";
@@ -49,6 +51,7 @@ export class SmsController {
   }
 
   /** Clinical staff may message their own facility's patients. */
+  @UseGuards(SmsEnabledGuard)
   @Roles("nurse_midwife", "chew", "doctor_mo", "facility_admin", "system_admin")
   @Post("send")
   send(@CurrentUser() user: Principal, @Body(new ZodValidationPipe(sendSchema)) dto: SendDto) {
@@ -63,6 +66,7 @@ export class SmsController {
 
   /** Bulk send is deliberately admin-only. */
   @Roles("facility_admin", "system_admin")
+  @UseGuards(SmsEnabledGuard)
   @Post("send-bulk")
   sendBulk(
     @CurrentUser() user: Principal,

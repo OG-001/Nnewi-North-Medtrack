@@ -125,7 +125,8 @@ export function DashboardPage() {
             />
           </div>
           <p className="mt-4 rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-800">
-            Defaulters here feed SMS reminders &amp; CHEW outreach once the SMS module (Phase 7) is live.
+            Defaulters here are worked by CHEW outreach. SMS reminders are switched off for
+            this deployment.
           </p>
         </div>
       </div>

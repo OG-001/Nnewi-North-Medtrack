@@ -171,9 +171,14 @@ built: production compose, TLS, hardened images, security headers, encrypted bac
 rehearsed restore, readiness and metrics endpoints, a secret scanner, and the runbooks in
 `docs/operations/`.
 
+**Deployment decisions taken 2026-09-23:** hosting is a Nigerian VPS (Q6 closed), the data
+controller and DPO are named in `infra/.env` and served by `GET /system/compliance` (Q9
+closed), retention is set (Q7 closed), and **SMS is switched off** for this deployment,
+enforced by a guard on the dispatch endpoints. Never describe SMS as available.
+
 **Nothing has been deployed.** No production restore rehearsal, no real-device verification,
-no live alerting, no training, no UAT, no pilot. The controller and DPO are unnamed (Q9), so
-the pilot cannot lawfully begin. SMS has never run against a real provider.
+no live alerting, no training, no UAT, no pilot. `PHC_DPO_CONTACT` is still unset, and one
+person currently holds both the controller and DPO roles.
 
 Clinical configuration (the immunization schedule and ANC contact model) is editable through
 the admin UI and hub-authoritative, cross-facility patient access is reason-prompted and

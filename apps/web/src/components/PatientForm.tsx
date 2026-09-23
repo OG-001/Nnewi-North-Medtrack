@@ -1,3 +1,4 @@
+import { smsEnabled } from "../lib/deployment";
 import { useMemo, useState } from "react";
 import { generateMrn, type Language, type Sex } from "@phc/shared";
 import { db } from "../db/db";
@@ -55,7 +56,9 @@ const emptyForm = {
   next_of_kin_relation: "",
   occupation: "",
   preferred_language: "en" as Language,
-  sms_consent: true,
+  // Defaults to false: consent is something a patient gives, not something a
+  // form assumes, and this deployment does not send SMS at all.
+  sms_consent: false,
   nin: "",
 };
 
@@ -268,12 +271,17 @@ export function PatientForm({
         <Field label="NIN (optional)" hint="11 digits; never required">
           <input className="input" inputMode="numeric" value={form.nin} onChange={(e) => set("nin", e.target.value)} />
         </Field>
-        <div className="flex items-end">
-          <label className="flex items-center gap-2 pb-2 text-sm text-slate-700">
-            <input type="checkbox" checked={form.sms_consent} onChange={(e) => set("sms_consent", e.target.checked)} />
-            Consent to SMS reminders
-          </label>
-        </div>
+        {/* Consent is asked for only where SMS is actually in use. Collecting
+            a consent for a processing activity this deployment does not carry
+            out would be collecting data with no purpose (NDPA minimisation). */}
+        {smsEnabled() && (
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 pb-2 text-sm text-slate-700">
+              <input type="checkbox" checked={form.sms_consent} onChange={(e) => set("sms_consent", e.target.checked)} />
+              Consent to SMS reminders
+            </label>
+          </div>
+        )}
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}

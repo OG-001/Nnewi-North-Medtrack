@@ -7,6 +7,7 @@ import { FacilityPermissionsModule } from "./common/facility-permissions.service
 import { AuthModule } from "./auth/auth.module";
 import { SyncModule } from "./sync/sync.module";
 import { SystemModule } from "./system/system.module";
+import { ComplianceModule } from "./compliance/compliance.module";
 import { AdminModule } from "./admin/admin.module";
 import { SmsModule } from "./sms/sms.module";
 import { ReportsModule } from "./reports/reports.module";
@@ -32,6 +33,7 @@ import { RolesGuard } from "./common/guards/roles.guard";
     AuthModule,
     SyncModule,
     SystemModule,
+    ComplianceModule,
     AdminModule,
     SmsModule,
     ReportsModule,

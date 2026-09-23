@@ -1,7 +1,8 @@
 # Records of processing
 
-**Status:** template. The bracketed fields are the data controller's to complete
-before go-live, and cannot be filled in from the codebase.
+**Status:** populated for the pilot. The controller and DPO are configuration,
+not code: they are set in `infra/.env` and served by
+`GET /api/v1/system/compliance`, so a change of post is a config change.
 
 **Purpose:** the NDPA 2023 accountability principle requires a controller to
 maintain a record of its processing activities. This is that record for
@@ -13,9 +14,14 @@ PHC-Track, prepared from what the system actually does.
 
 | Field | Value |
 |-------|-------|
-| Data controller | `[TO BE NAMED]` (Open question Q9) |
-| Data Protection Officer | `[TO BE NAMED]` (Q9) |
-| Contact address | `[TO BE COMPLETED]` |
+| Data controller | Ogechukwu Eleodimuo (`PHC_DATA_CONTROLLER`) |
+| Data Protection Officer | Ogechukwu Eleodimuo (`PHC_DPO_NAME`) |
+| Contact address | `[TO BE COMPLETED]` (`PHC_DPO_CONTACT`) |
+
+> **One person currently holds both roles.** That is workable for a pilot of one
+> or two PHCs and it is a recognised weakness: the DPO's job includes checking
+> the controller's decisions, so the two being the same person removes that
+> check. Separate them before LGA-wide rollout, and record the date.
 
 ## 2. Purposes of processing
 
@@ -53,24 +59,41 @@ The **NIN is optional and never required**, per the locked decisions in
 |-----------|-------------------|-------|
 | LGA health authority and M&E | Aggregate monthly figures | Legal obligation |
 | DHIS2 / NHMIS | Aggregate monthly figures | Legal obligation |
-| SMS provider (Africa's Talking or Termii) | Phone number and message body only | Processor, under a DPA |
+| SMS provider | **None. SMS is switched off for this deployment.** | n/a |
 
-The SMS body carries the visit date and the facility name. **No diagnosis or
-clinical detail.** The provider is a data processor and a data processing
-agreement is required before live dispatch.
+**No personal data is shared with any third party.** SMS is disabled
+(`SMS_ENABLED=false`), so no processor receives a phone number or a message.
+
+The module remains in the codebase and the hub refuses to dispatch while the
+flag is off. Before it is ever switched on, a data processing agreement with the
+provider is required, and SMS consent must start being collected at
+registration: the consent field is hidden while SMS is off, so existing records
+do not carry one.
 
 ## 6. Transfers outside Nigeria
 
-**None.** The system is self-hosted in-country, and backups stay in-country. The
-SMS providers are Nigerian.
+**None.** The system is self-hosted on a Nigerian VPS and backups stay
+in-country. No SMS provider is in use.
 
 ## 7. Retention
 
-`[TO BE SET]` (Open question Q7). Clinical records are soft-deleted and never
-hard-deleted, so retention is a policy that governs archival and eventual
-disposal, not a deletion the application performs on its own.
+Set in `infra/.env` and reported by `GET /api/v1/system/compliance`.
 
-Backups retain for `BACKUP_RETENTION_DAYS`, default 30 days.
+| Record | Period | Why |
+|--------|--------|-----|
+| General clinical | 10 years after last contact | Standard clinical practice |
+| Maternity and ANC | 25 years | Obstetric claims have a long tail |
+| A child's record | Until they turn 18, or the general period if longer | Only they can act on it once adult |
+| Backups | 30 days (`BACKUP_RETENTION_DAYS`) | Local copies, once shipped off-host |
+
+**These govern archival review, not automatic deletion.** Clinical records are
+soft-deleted and never hard-deleted, so nothing is removed by the passage of
+time. Disposal at the end of a retention period is a reviewed, audited
+operation a person carries out.
+
+**Confirm these against current Nigerian requirements before go-live.** They are
+defensible defaults drawn from common clinical practice, not a citation of a
+Nigerian statutory period, and the controller should have that checked.
 
 ## 8. Security measures
 

@@ -128,12 +128,14 @@ security headers, encrypted backups with a rehearsed restore, readiness and
 metrics endpoints, a secret scanner, and runbooks under
 [`docs/operations/`](docs/operations/).
 
-**Not done, and blocking go-live:** nothing has been deployed. There has been no
-production restore rehearsal, no verification on real low-end Android devices, no
-live alerting, no staff training, no UAT run, and no pilot. The data controller
-and Data Protection Officer are still unnamed, and the pilot cannot lawfully
-begin without them. SMS has never run against a real provider. See the Phase 10
-change-log entry for the full list. See the
+**Deployment decisions taken (2026-09-23):** hosting is a Nigerian VPS, the data
+controller and Data Protection Officer are named in `infra/.env`, retention is
+set, and **SMS is switched off** for this deployment.
+
+**Not done, and still blocking go-live:** nothing has been deployed. There has
+been no production restore rehearsal, no verification on real low-end Android
+devices, no live alerting, no staff training, no UAT run, and no pilot. See the
+Phase 10 change-log entry for the full list. See the
 change-log under [`devops/change_log/`](devops/change_log/) — the Phase 3 entry
 records what is still open before that phase's exit gate can be signed off.
 

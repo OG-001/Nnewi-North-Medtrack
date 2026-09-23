@@ -30,6 +30,7 @@ import { newId } from "@phc/shared";
 import { getDeviceId } from "./device";
 import { endHubSession, establishHubSession, primeClinicalConfig } from "./hub-session";
 import { getWithdrawnPermissions } from "./clinical-config";
+import { loadDeployment } from "./deployment";
 
 interface SessionValue {
   user: UserAccount | null;
@@ -64,6 +65,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // Load the cached clinical schedule first: an offline device must still
       // schedule against the configured schedule, not only the built-in one.
       await primeClinicalConfig();
+      void loadDeployment();
 
       const savedSelected = localStorage.getItem(LS_SELECTED_FAC);
       if (savedSelected) {

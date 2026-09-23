@@ -11,6 +11,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 const API = process.env.E2E_API_URL ?? "http://localhost:3100/api/v1";
 const FACILITY = "fac-0062";
 const hubUp = process.env.PHC_HUB_UP === "1";
+/** Dispatch is behind a deployment kill switch; see test/global-setup.ts. */
+const smsOn = process.env.PHC_SMS_ENABLED === "1";
 
 let nurseToken = "";
 let adminToken = "";
@@ -79,7 +81,7 @@ beforeAll(async () => {
   });
 }, 30_000);
 
-describe.skipIf(!hubUp)("SMS against a live hub", () => {
+describe.skipIf(!hubUp || !smsOn)("SMS against a live hub", () => {
   it("serves the seeded templates in English and Igbo", async () => {
     const res = await api("/sms/templates");
     const templates = (await res.json()) as { key: string; bodies: Record<string, string> }[];

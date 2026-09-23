@@ -8,6 +8,7 @@ import {
 } from "@phc/shared";
 import { db } from "../db/db";
 import { SmsAdmin } from "../components/SmsAdmin";
+import { smsEnabled } from "../lib/deployment";
 import { StaffAdmin } from "../components/StaffAdmin";
 import { AuditLog } from "../components/AuditLog";
 import { ConflictQueue } from "../components/ConflictQueue";
@@ -26,6 +27,8 @@ const TABS: Tab[] = [
   { key: "facilities", label: "Facilities", perm: "facility.manage" },
   { key: "staff", label: "Staff", perm: "staff.manage" },
   { key: "config", label: "Schedules", perm: "schedule.edit" },
+  // SMS is listed only when the deployment has it switched on; see
+  // lib/deployment.ts. A tab for a feature that cannot send is worse than none.
   { key: "sms", label: "SMS", perm: "sms.send" },
   { key: "duplicates", label: "Duplicates", perm: "patient.merge" },
   { key: "audit", label: "Audit log", perm: "audit.view" },
@@ -34,7 +37,9 @@ const TABS: Tab[] = [
 
 export function AdminPage() {
   const { can } = useSession();
-  const available = TABS.filter((t) => can(t.perm));
+  const available = TABS.filter(
+    (t) => can(t.perm) && (t.key !== "sms" || smsEnabled()),
+  );
   const [tab, setTab] = useState(available[0]?.key ?? "facilities");
 
   if (available.length === 0) {

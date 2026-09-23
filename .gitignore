@@ -25,3 +25,10 @@ test-results/
 credentials.md
 apps/api/dist/
 packages/shared/dist/
+
+# Evidence archives. The screenshots and video under docs/evidence/ are tracked
+# individually; these .zip bundles only repackage them, so committing one stores
+# the same pixels a second time in a form git cannot diff or deduplicate.
+# Build them when you need to hand the evidence over, do not commit them.
+docs/evidence/*.zip
+docs/evidence/**/*.zip

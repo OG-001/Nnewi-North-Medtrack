@@ -10,6 +10,8 @@ import { db } from "../db/db";
 import { SmsAdmin } from "../components/SmsAdmin";
 import { StaffAdmin } from "../components/StaffAdmin";
 import { AuditLog } from "../components/AuditLog";
+import { ConflictQueue } from "../components/ConflictQueue";
+import { MergeTool } from "../components/MergeTool";
 import { ScheduleEditor } from "../components/ScheduleEditor";
 import { createRecord, saveRecord } from "../db/repository";
 import { useSession } from "../lib/session";
@@ -25,6 +27,7 @@ const TABS: Tab[] = [
   { key: "staff", label: "Staff", perm: "staff.manage" },
   { key: "config", label: "Schedules", perm: "schedule.edit" },
   { key: "sms", label: "SMS", perm: "sms.send" },
+  { key: "duplicates", label: "Duplicates", perm: "patient.merge" },
   { key: "audit", label: "Audit log", perm: "audit.view" },
   { key: "health", label: "Sync & health", perm: "sync.health.view" },
 ];
@@ -65,6 +68,7 @@ export function AdminPage() {
       {tab === "staff" && <StaffTab />}
       {tab === "config" && <ConfigTab />}
       {tab === "sms" && <SmsAdmin />}
+      {tab === "duplicates" && <MergeTool />}
       {tab === "audit" && <AuditTab />}
       {tab === "health" && <HealthTab />}
     </div>
@@ -198,6 +202,7 @@ function HealthTab() {
           here until there is one.
         </p>
       </div>
+      <ConflictQueue />
     </div>
   );
 }

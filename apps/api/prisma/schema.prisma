@@ -283,3 +283,26 @@ model AppConfig {
 
   @@map("app_config")
 }
+
+/// Record of a patient-duplicate merge (data-model section 3, `patient_merge`).
+///
+/// Merging is destructive in effect even though nothing is hard-deleted, so it
+/// keeps its own permanent record: which record survived, which was folded in,
+/// who did it, why, and what was re-pointed. Reports computed before a merge
+/// double-count the patient, so this is also the evidence for correcting them.
+model PatientMerge {
+  id          String   @id @default(uuid()) @db.Uuid
+  survivingId String   @map("surviving_id")
+  /// Unique: a record can only be merged away once.
+  mergedId    String   @unique @map("merged_id")
+  facilityId  String   @map("facility_id")
+  mergedBy    String   @map("merged_by")
+  mergedAt    DateTime @default(now()) @map("merged_at")
+  reason      String
+  /// Counts of the rows re-pointed, per entity type.
+  details     Json
+
+  @@index([survivingId])
+  @@index([facilityId, mergedAt])
+  @@map("patient_merge")
+}

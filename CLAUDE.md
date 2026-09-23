@@ -178,7 +178,11 @@ the pilot cannot lawfully begin. SMS has never run against a real provider.
 Clinical configuration (the immunization schedule and ANC contact model) is editable through
 the admin UI and hub-authoritative, cross-facility patient access is reason-prompted and
 audited, and staff, facility and audit administration are server-side: disabling an account
-now revokes its refresh tokens and devices rather than relabelling a local row.
+now revokes its refresh tokens and devices rather than relabelling a local row. Patient
+duplicate merge and the conflict-review queue are built.
+
+Still unbuilt in Phase 9: queue-stations configuration, audit-log export, and per-facility
+permission toggles.
 
 An agent must never describe a deferred capability as if it exists, and must not describe a
 built one as missing. Check `devops/change_log/` for the current position.

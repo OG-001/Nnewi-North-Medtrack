@@ -51,6 +51,10 @@ Revisit only if the LGA requires physical custody of the hardware as policy.
 ## 2. Deploy
 
 ```bash
+# Generates infra/.env with fresh secrets, and asks for the domain, the
+# certificate email and the DPO contact. Refuses to overwrite an existing file.
+./infra/scripts/init-env.sh --prod
+
 mkdir -p infra/backups && sudo chown 70:70 infra/backups
 
 docker compose -f infra/docker-compose.prod.yml --env-file infra/.env build

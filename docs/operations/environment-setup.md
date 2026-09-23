@@ -166,23 +166,42 @@ and `packages/shared`.
 
 ## 7. Step 6: Configure the hub
 
+One command, which generates the secrets for you:
+
+```bash
+./infra/scripts/init-env.sh
+```
+
+That writes `apps/api/.env` with a freshly generated `JWT_SECRET` and a
+`DATABASE_URL` pointing at the development database. If 5432 was already taken
+in step 4, pass the port you used:
+
+```bash
+./infra/scripts/init-env.sh --db-port 55432
+```
+
+The script **refuses to overwrite an existing `.env`**, so it cannot destroy the
+secrets of something already running. Pass `--force` only when you mean to
+rotate them.
+
+For the pilot server, use `--prod`. It asks for the three values it cannot
+generate (domain, certificate email, DPO contact) and writes `infra/.env`.
+
+> **Why a script rather than files in the repository, or values pasted from a
+> chat:** a secret that travels through a transcript, a terminal history or an
+> issue has already leaked. Generated on the machine that will use it, it exists
+> nowhere else. `.env` files are gitignored and must never be committed; only
+> `.env.example` is tracked, and it holds placeholders only.
+
+### Doing it by hand instead
+
 ```bash
 cp apps/api/.env.example apps/api/.env
 ```
 
-Edit `apps/api/.env` and set two values:
-
-```bash
-DATABASE_URL="postgresql://phc:phc_dev_only@localhost:5432/phc_track?schema=public"
-JWT_SECRET="<paste the output of: openssl rand -base64 48>"
-```
-
-`JWT_SECRET` signs the access tokens. Any string of at least 32 characters
-works for development, but generate a real one rather than typing something
-memorable, because the habit is what matters.
-
-> **`.env` files are gitignored and must never be committed.** Only
-> `.env.example` is tracked, and it holds placeholders only.
+Then set `DATABASE_URL` to match step 4, and `JWT_SECRET` to the output of
+`openssl rand -base64 48`. Any string of at least 32 characters works for
+development, but generate a real one: the habit is what matters.
 
 ---
 
@@ -340,6 +359,7 @@ note in section 3.
 
 | Task | Document |
 |------|----------|
+| Create the `.env` files | `./infra/scripts/init-env.sh`, see section 7 |
 | Deploy to the pilot server | [`deployment-runbook.md`](deployment-runbook.md) |
 | Backups and restoring | [`backup-and-restore.md`](backup-and-restore.md) |
 | Monitoring and alerts | [`observability.md`](observability.md) |

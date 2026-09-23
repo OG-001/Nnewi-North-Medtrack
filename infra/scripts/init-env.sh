@@ -15,6 +15,7 @@
 #   ./infra/scripts/init-env.sh                 # local development
 #   ./infra/scripts/init-env.sh --prod          # the pilot server
 #   ./infra/scripts/init-env.sh --db-port 55432 # when 5432 is already taken
+#   ./infra/scripts/init-env.sh --api-port 3100 # when 3000 is already taken
 #
 # It refuses to overwrite an existing file, so it cannot destroy the secrets of
 # a running deployment. Use --force only when you mean to rotate everything.
@@ -24,6 +25,7 @@ cd "$(git rev-parse --show-toplevel)"
 
 MODE="dev"
 DB_PORT="5432"
+API_PORT="3000"
 FORCE="no"
 
 while [ $# -gt 0 ]; do
@@ -31,8 +33,9 @@ while [ $# -gt 0 ]; do
     --prod) MODE="prod" ;;
     --dev) MODE="dev" ;;
     --db-port) DB_PORT="${2:?--db-port needs a value}"; shift ;;
+    --api-port) API_PORT="${2:?--api-port needs a value}"; shift ;;
     --force) FORCE="yes" ;;
-    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
   shift
@@ -70,7 +73,17 @@ JWT_SECRET="$(secret)"
 ACCESS_TOKEN_TTL="15m"
 REFRESH_TOKEN_TTL_DAYS="30"
 
-PORT=3000
+# Accountability and retention. Not secret, and mirrored from production so a
+# local run reflects the real configuration rather than reporting
+# "Not yet designated" on GET /system/compliance.
+PHC_DATA_CONTROLLER="Ogechukwu Eleodimuo"
+PHC_DPO_NAME="Ogechukwu Eleodimuo"
+PHC_DPO_CONTACT=""
+PHC_RETENTION_GENERAL_YEARS=10
+PHC_RETENTION_MATERNITY_YEARS=25
+PHC_RETENTION_CHILD_UNTIL_AGE=18
+
+PORT=${API_PORT}
 CORS_ORIGINS="http://localhost:5173,http://localhost:4173"
 
 # SMS is switched off for this deployment.
@@ -78,13 +91,19 @@ SMS_ENABLED=false
 SMS_REMINDERS_ENABLED=false
 EOF
 
+  chmod 600 "$TARGET"   # explicit: --force truncates, keeping the old file's mode
   echo "Created $TARGET (permissions 600)."
+  if command -v ss >/dev/null && ss -ltn 2>/dev/null | grep -q ":${API_PORT} "; then
+    echo
+    echo "WARNING: something is already listening on port ${API_PORT}." >&2
+    echo "         The hub will fail to start. Re-run with --api-port <free port> --force." >&2
+  fi
   echo
   echo "Next:"
   echo "  1. docker compose -f infra/docker-compose.yml up -d postgres"
   echo "  2. pnpm db:migrate && pnpm db:seed"
   echo "  3. pnpm dev:api        (terminal 1)"
-  echo "  4. VITE_API_BASE_URL=http://localhost:3000/api/v1 pnpm dev   (terminal 2)"
+  echo "  4. VITE_API_BASE_URL=http://localhost:${API_PORT}/api/v1 pnpm dev   (terminal 2)"
   [ "$DB_PORT" != "5432" ] && echo "  Note: using database port $DB_PORT. Match it in infra/docker-compose.yml."
   exit 0
 fi
@@ -156,6 +175,7 @@ SMS_ENABLED=false
 SMS_REMINDERS_ENABLED=false
 EOF
 
+chmod 600 "$TARGET"   # explicit: --force truncates, keeping the old file's mode
 echo "Created $TARGET (permissions 600). Secrets were generated locally and not printed."
 echo
 echo "Next:"

@@ -1,4 +1,5 @@
-import { Controller, Get, Query } from "@nestjs/common";
+import { Controller, Get, Header, Query, Res } from "@nestjs/common";
+import type { Response } from "express";
 import { AuditService } from "./audit.service";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { Roles } from "../common/decorators/roles.decorator";
@@ -32,6 +33,32 @@ export class AuditController {
       limit: Number(limit) || undefined,
       cursor,
     });
+  }
+
+  @Get("export")
+  @Header("cache-control", "no-store")
+  async export(
+    @CurrentUser() user: Principal,
+    @Res() res: Response,
+    @Query("action") action?: string,
+    @Query("entityType") entityType?: string,
+    @Query("facility") facilityId?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    const result = await this.audit.exportCsv(user, {
+      action,
+      entityType,
+      facilityId,
+      from,
+      to,
+    });
+    res.setHeader("content-type", "text/csv");
+    res.setHeader(
+      "content-disposition",
+      `attachment; filename="phc-track-audit-${new Date().toISOString().slice(0, 10)}.csv"`,
+    );
+    res.send(result.csv);
   }
 
   @Get("actions")

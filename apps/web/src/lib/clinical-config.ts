@@ -14,10 +14,15 @@ import { useEffect, useState } from "react";
 import {
   DEFAULT_CLINICAL_CONFIG,
   validateConfig,
+  withdrawnPermissions,
   type AncModelConfig,
   type AppClinicalConfig,
   type ConfigKey,
+  type FacilityPermissionsConfig,
   type ImmunizationSchedule,
+  type Permission,
+  type QueueStationConfig,
+  type Role,
 } from "@phc/shared";
 import { db } from "../db/db";
 import { apiFetch, hasHubSession } from "./api";
@@ -50,6 +55,19 @@ export function getImmunizationSchedule(): ImmunizationSchedule {
 
 export function getAncModelConfig(): AncModelConfig {
   return current.anc_model;
+}
+
+export function getQueueStations(): QueueStationConfig {
+  return current.queue_stations;
+}
+
+export function getFacilityPermissions(): FacilityPermissionsConfig {
+  return current.facility_permissions;
+}
+
+/** Permissions this facility has switched off for these roles. */
+export function getWithdrawnPermissions(facilityId: string | null, roles: Role[]): Permission[] {
+  return withdrawnPermissions(current.facility_permissions, facilityId, roles);
 }
 
 /** Load the cached config from the device. Safe to call repeatedly. */

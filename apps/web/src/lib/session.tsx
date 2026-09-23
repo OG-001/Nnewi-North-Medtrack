@@ -29,6 +29,7 @@ import type { UserAccount } from "../db/types";
 import { newId } from "@phc/shared";
 import { getDeviceId } from "./device";
 import { endHubSession, establishHubSession, primeClinicalConfig } from "./hub-session";
+import { getWithdrawnPermissions } from "./clinical-config";
 
 interface SessionValue {
   user: UserAccount | null;
@@ -158,7 +159,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       setFacility,
-      can: (permission: Permission) => canRole(roles, permission),
+      // A facility may withdraw a permission from a role, never add one, so the
+      // withdrawal is applied on top of the role matrix (rbac-and-scope §3).
+      can: (permission: Permission) =>
+        canRole(roles, permission, getWithdrawnPermissions(facilityId, roles)),
     };
   }, [user, selectedFacilityId, facilityId, selectFacility, clearFacility, login, logout, setFacility]);
 

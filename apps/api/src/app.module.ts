@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { PrismaModule } from "./prisma/prisma.module";
+import { FacilityPermissionsModule } from "./common/facility-permissions.service";
 import { AuthModule } from "./auth/auth.module";
 import { SyncModule } from "./sync/sync.module";
 import { SystemModule } from "./system/system.module";
@@ -27,6 +28,7 @@ import { RolesGuard } from "./common/guards/roles.guard";
       },
     ]),
     PrismaModule,
+    FacilityPermissionsModule,
     AuthModule,
     SyncModule,
     SystemModule,

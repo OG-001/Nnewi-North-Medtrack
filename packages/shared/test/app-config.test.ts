@@ -13,6 +13,9 @@ import {
   computeAncSchedule,
   computeChildSchedule,
   DEFAULT_EPI_SCHEDULE,
+  activeStations,
+  withdrawnPermissions,
+  can,
 } from "../src/index";
 
 const validItem = {
@@ -149,5 +152,117 @@ describe("engines honour edited configuration", () => {
   it("falls back to the built-in model when no override is given", () => {
     const contacts = computeAncSchedule(new Date("2026-01-01T00:00:00Z"), "who_2016_8");
     expect(contacts.length).toBeGreaterThan(1);
+  });
+});
+
+describe("queue stations config", () => {
+  const valid = {
+    stations: [
+      { key: "registration", label: "Front desk", order: 0, active: true },
+      { key: "vitals", label: "Vitals", order: 1, active: true },
+      { key: "consultation", label: "Consultation", order: 2, active: true },
+      { key: "pharmacy", label: "Pharmacy", order: 3, active: false },
+    ],
+  };
+
+  it("accepts the shipped default", () => {
+    expect(validateConfig("queue_stations", DEFAULT_CLINICAL_CONFIG.queue_stations).ok).toBe(true);
+  });
+
+  it("allows relabelling and switching a station off", () => {
+    const result = validateConfig("queue_stations", valid);
+    expect(result.ok).toBe(true);
+  });
+
+  it("refuses to drop a station that queue rows may already reference", () => {
+    const result = validateConfig("queue_stations", {
+      stations: valid.stations.filter((s) => s.key !== "pharmacy"),
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.issues[0].issue).toContain("cannot be removed");
+  });
+
+  it("refuses a duplicate station", () => {
+    const result = validateConfig("queue_stations", {
+      stations: [...valid.stations, { key: "vitals", label: "Again", order: 9, active: true }],
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("refuses switching every station off", () => {
+    const result = validateConfig("queue_stations", {
+      stations: valid.stations.map((s) => ({ ...s, active: false })),
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.issues[0].issue).toContain("At least one station");
+  });
+
+  it("lists active stations in the configured order", () => {
+    const ordered = activeStations({
+      stations: [
+        { key: "pharmacy", label: "Pharmacy", order: 1, active: true },
+        { key: "registration", label: "Front desk", order: 0, active: true },
+        { key: "vitals", label: "Vitals", order: 2, active: false },
+        { key: "consultation", label: "Consultation", order: 3, active: true },
+      ],
+    });
+    expect(ordered.map((s) => s.key)).toEqual(["registration", "pharmacy", "consultation"]);
+  });
+});
+
+describe("per-facility permission toggles", () => {
+  const config = {
+    facilities: {
+      "fac-0062": { nurse_midwife: ["prescribe"] as const },
+    },
+  };
+
+  it("accepts a deny list", () => {
+    expect(validateConfig("facility_permissions", config).ok).toBe(true);
+  });
+
+  it("rejects an unknown permission", () => {
+    const result = validateConfig("facility_permissions", {
+      facilities: { "fac-0062": { nurse_midwife: ["fly_a_plane"] } },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejects an unknown role", () => {
+    const result = validateConfig("facility_permissions", {
+      facilities: { "fac-0062": { wizard: ["prescribe"] } },
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("withdraws only at the facility that configured it", () => {
+    expect(withdrawnPermissions(config, "fac-0062", ["nurse_midwife"])).toEqual(["prescribe"]);
+    expect(withdrawnPermissions(config, "fac-0060", ["nurse_midwife"])).toEqual([]);
+    expect(withdrawnPermissions(config, null, ["nurse_midwife"])).toEqual([]);
+  });
+
+  it("withdraws only for the roles it names", () => {
+    expect(withdrawnPermissions(config, "fac-0062", ["doctor_mo"])).toEqual([]);
+  });
+});
+
+describe("can() with facility withdrawals", () => {
+  it("grants a permission the role matrix allows", () => {
+    expect(can(["nurse_midwife"], "prescribe")).toBe(true);
+  });
+
+  it("withdraws it when the facility has switched it off", () => {
+    expect(can(["nurse_midwife"], "prescribe", ["prescribe"])).toBe(false);
+  });
+
+  it("cannot be used to grant beyond the role matrix", () => {
+    // A withdrawal list is a deny list. Nothing here can give a clerk a
+    // permission the matrix withholds, whatever is configured.
+    expect(can(["records_clerk"], "prescribe", [])).toBe(false);
+    expect(can(["records_clerk"], "prescribe")).toBe(false);
+  });
+
+  it("leaves other permissions alone", () => {
+    expect(can(["nurse_midwife"], "immunization.record", ["prescribe"])).toBe(true);
   });
 });

@@ -15,7 +15,7 @@ import { Badge } from "./ui";
 import { formatDateTime, titleCase } from "../lib/format";
 import { useSync } from "../lib/sync";
 import { hasHubSession } from "../lib/api";
-import { auditActions, listAudit, type HubAuditEvent } from "../lib/admin-api";
+import { auditActions, auditExportUrl, listAudit, type HubAuditEvent } from "../lib/admin-api";
 
 export function AuditLog() {
   const sync = useSync();
@@ -60,14 +60,24 @@ export function AuditLog() {
           {online ? "Hub audit log" : "This device only (offline)"}
         </Badge>
         {online && (
-          <select className="input !w-auto !py-1 !text-xs" value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="">All actions</option>
-            {actions.map((a) => (
-              <option key={a.action} value={a.action}>
-                {titleCase(a.action)} ({a.count})
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <a
+              className="btn-secondary !py-1 !text-xs"
+              href={auditExportUrl(filter || undefined)}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Export CSV
+            </a>
+            <select className="input !w-auto !py-1 !text-xs" value={filter} onChange={(e) => setFilter(e.target.value)}>
+              <option value="">All actions</option>
+              {actions.map((a) => (
+                <option key={a.action} value={a.action}>
+                  {titleCase(a.action)} ({a.count})
+                </option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
 

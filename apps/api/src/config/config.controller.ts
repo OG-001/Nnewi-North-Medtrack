@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Put } from "@nestjs/common";
 import { ClinicalConfigService } from "./config.service";
+import { FacilityPermissionsService } from "../common/facility-permissions.service";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { Roles } from "../common/decorators/roles.decorator";
 import type { Principal } from "../common/principal";
@@ -10,7 +11,10 @@ import type { Principal } from "../common/principal";
  */
 @Controller("config")
 export class ClinicalConfigController {
-  constructor(private readonly config: ClinicalConfigService) {}
+  constructor(
+    private readonly config: ClinicalConfigService,
+    private readonly permissions: FacilityPermissionsService,
+  ) {}
 
   @Get()
   getAll() {
@@ -24,11 +28,13 @@ export class ClinicalConfigController {
 
   @Roles("facility_admin", "system_admin")
   @Put(":key")
-  put(
+  async put(
     @CurrentUser() user: Principal,
     @Param("key") key: string,
     @Body() body: { value: unknown },
   ) {
+    // The role allows it; the facility may still have switched it off.
+    await this.permissions.assert(user, "schedule.edit");
     return this.config.put(user, key, body?.value);
   }
 }

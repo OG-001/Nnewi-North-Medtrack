@@ -18,6 +18,7 @@ import {
   type AncModelItem,
   type ImmunizationSchedule,
   type ImmunizationScheduleItem,
+  type QueueStationConfig,
 } from "@phc/shared";
 import { Badge } from "./ui";
 import { useSync } from "../lib/sync";
@@ -25,6 +26,7 @@ import { hasHubSession } from "../lib/api";
 import {
   getAncModelConfig,
   getImmunizationSchedule,
+  getQueueStations,
   refreshConfigFromHub,
   saveConfigToHub,
 } from "../lib/clinical-config";
@@ -44,10 +46,11 @@ export function ScheduleEditor({ canEdit }: { canEdit: boolean }) {
 
   const [schedule, setSchedule] = useState<ImmunizationSchedule>(getImmunizationSchedule());
   const [anc, setAnc] = useState<AncModelConfig>(getAncModelConfig());
+  const [stations, setStations] = useState<QueueStationConfig>(getQueueStations());
   const [problems, setProblems] = useState<Problem[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [dirty, setDirty] = useState<"epi" | "anc" | null>(null);
+  const [dirty, setDirty] = useState<"epi" | "anc" | "stations" | null>(null);
 
   useEffect(() => {
     if (!online) return;
@@ -55,6 +58,7 @@ export function ScheduleEditor({ canEdit }: { canEdit: boolean }) {
       if (!ok) return;
       setSchedule(getImmunizationSchedule());
       setAnc(getAncModelConfig());
+      setStations(getQueueStations());
     });
   }, [online]);
 
@@ -76,8 +80,17 @@ export function ScheduleEditor({ canEdit }: { canEdit: boolean }) {
     setStatus(null);
   }
 
-  async function save(key: "immunization_schedule" | "anc_model") {
-    const value = key === "immunization_schedule" ? schedule : anc;
+  function updateStation(index: number, patch: Partial<QueueStationConfig["stations"][number]>) {
+    setStations((prev) => ({
+      stations: prev.stations.map((station, i) => (i === index ? { ...station, ...patch } : station)),
+    }));
+    setDirty("stations");
+    setStatus(null);
+  }
+
+  async function save(key: "immunization_schedule" | "anc_model" | "queue_stations") {
+    const value =
+      key === "immunization_schedule" ? schedule : key === "anc_model" ? anc : stations;
 
     // Validate before the request, so an obvious mistake is caught without a
     // round trip. The hub validates again, because it is the authority.
@@ -208,6 +221,77 @@ export function ScheduleEditor({ canEdit }: { canEdit: boolean }) {
           Changing a due age affects children scheduled from now on. Doses already recorded are
           not altered.
         </p>
+      </div>
+
+      {/* ---- Queue stations ---- */}
+      <div className="card p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-slate-700">Clinic queue stations</h3>
+          {canEdit && (
+            <button
+              className="btn-primary !py-1 !text-xs"
+              disabled={disabled || dirty !== "stations"}
+              onClick={() => void save("queue_stations")}
+            >
+              {busy ? "Saving…" : "Save stations"}
+            </button>
+          )}
+        </div>
+
+        <p className="mb-2 text-xs text-slate-500">
+          Rename a station to match what staff call it, reorder the flow, or switch off one this
+          PHC does not run. A station cannot be removed, because queue entries already recorded
+          at it would have nowhere to belong.
+        </p>
+
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-3 py-2 text-left">Station</th>
+                <th className="px-3 py-2 text-left">Label staff see</th>
+                <th className="px-3 py-2 text-left">Order</th>
+                <th className="px-3 py-2 text-left">In use</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {stations.stations.map((station, index) => (
+                <tr key={station.key}>
+                  <td className="px-3 py-1.5 font-mono text-xs text-slate-500">{station.key}</td>
+                  <td className="px-3 py-1.5">
+                    <input
+                      className="input !py-1 !text-sm"
+                      value={station.label}
+                      disabled={disabled}
+                      aria-label={`${station.key} label`}
+                      onChange={(e) => updateStation(index, { label: e.target.value })}
+                    />
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <input
+                      className="input !w-20 !py-1 !text-sm"
+                      type="number"
+                      min={0}
+                      value={station.order}
+                      disabled={disabled}
+                      aria-label={`${station.key} order`}
+                      onChange={(e) => updateStation(index, { order: Number(e.target.value) })}
+                    />
+                  </td>
+                  <td className="px-3 py-1.5">
+                    <input
+                      type="checkbox"
+                      checked={station.active}
+                      disabled={disabled}
+                      aria-label={`${station.key} in use`}
+                      onChange={(e) => updateStation(index, { active: e.target.checked })}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* ---- ANC contact model ---- */}

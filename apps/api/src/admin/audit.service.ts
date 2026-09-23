@@ -75,6 +75,71 @@ export class AuditService {
     };
   }
 
+  /**
+   * Export the audit trail as CSV (Phase 9 task 5).
+   *
+   * Capped, because an unbounded export of a year's trail would exhaust memory
+   * and is not what an investigation needs. Narrow the window instead.
+   */
+  async exportCsv(principal: Principal, q: AuditQuery, maxRows = 10_000) {
+    const { events } = await this.query(principal, { ...q, limit: Math.min(maxRows, 10_000) });
+
+    const header = [
+      "at",
+      "actor_user_id",
+      "action",
+      "entity_type",
+      "entity_id",
+      "facility_id",
+      "device_id",
+      "details",
+    ];
+    const cell = (value: unknown) => {
+      if (value === null || value === undefined) return "";
+      const text = typeof value === "object" ? JSON.stringify(value) : String(value);
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+
+    const lines = [header.join(",")];
+    for (const e of events) {
+      lines.push(
+        [
+          cell(e.at.toISOString()),
+          cell(e.actorUserId),
+          cell(e.action),
+          cell(e.entityType),
+          cell(e.entityId),
+          cell(e.facilityId),
+          cell(e.deviceId),
+          cell(e.details),
+        ].join(","),
+      );
+    }
+
+    // Exporting the audit trail is itself an auditable act: it takes a copy of
+    // who did what out of the system, and the trail should show that happened.
+    // Stamped with the facility the export covered, so the administrator who
+    // took the copy can see their own action in their own log. A facility-less
+    // event is invisible to a facility-scoped viewer, which would make this
+    // record exist without being readable by the person it is about.
+    const exportFacility =
+      q.facilityId ??
+      (principal.facilityScope?.length === 1 ? principal.facilityScope[0] : null);
+
+    await this.prisma.auditEvent.create({
+      data: {
+        actorUserId: principal.userId,
+        action: "audit_exported",
+        entityType: "audit_event",
+        facilityId: exportFacility,
+        deviceId: principal.deviceId,
+        details: { rows: events.length, filters: q as Prisma.InputJsonValue },
+      },
+    });
+
+    return { csv: lines.join("\n"), rows: events.length };
+  }
+
   /** Distinct actions present, so the viewer can offer a real filter list. */
   async actions(principal: Principal) {
     const scope = principal.facilityScope;

@@ -7,7 +7,7 @@
  * where the accounts actually live.
  */
 import type { Role } from "@phc/shared";
-import { apiFetch } from "./api";
+import { apiFetch, API_BASE_URL } from "./api";
 
 export interface HubStaff {
   id: string;
@@ -83,4 +83,13 @@ export function listAudit(params: { action?: string; limit?: number; cursor?: st
 
 export function auditActions() {
   return apiFetch<{ action: string; count: number }[]>("/audit/actions");
+}
+
+/**
+ * URL for the audit CSV export. Opened in a new tab rather than fetched, so the
+ * browser handles the download. The export is itself recorded in the trail.
+ */
+export function auditExportUrl(action?: string): string {
+  const q = action ? `?action=${encodeURIComponent(action)}` : "";
+  return `${API_BASE_URL}/audit/export${q}`;
 }

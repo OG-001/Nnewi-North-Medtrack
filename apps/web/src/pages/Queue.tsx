@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
+  activeStations,
   toISODate,
   type QueuePriority,
   type QueueService,
@@ -9,6 +10,7 @@ import {
   type QueueStatus,
 } from "@phc/shared";
 import { db } from "../db/db";
+import { getQueueStations } from "../lib/clinical-config";
 import { createRecord, saveRecord } from "../db/repository";
 import { useSession } from "../lib/session";
 import { useScope, notDeleted } from "../lib/scope";
@@ -17,7 +19,22 @@ import { IconPlus, IconClock } from "../components/icons";
 import { displayName, patientAge, relativeTime, titleCase } from "../lib/format";
 import type { Patient, QueueEntry } from "../db/types";
 
-const STATION_FLOW: QueueStation[] = ["registration", "vitals", "consultation", "pharmacy"];
+/**
+ * The station flow is configuration, not code (Global Constraint 9). A PHC with
+ * no pharmacy switches it off; one that calls vitals something else relabels
+ * it. Falls back to the built-in order when no config has reached this device.
+ */
+function useStationFlow(): { flow: QueueStation[]; labelOf: (s: QueueStation) => string } {
+  const config = getQueueStations();
+  const active = activeStations(config);
+  const labels = new Map<QueueStation, string>(
+    config.stations.map((station) => [station.key, station.label]),
+  );
+  return {
+    flow: active.map((s) => s.key),
+    labelOf: (station) => labels.get(station) ?? titleCase(station),
+  };
+}
 
 const STATUS_TONE: Record<QueueStatus, "amber" | "blue" | "green" | "slate"> = {
   waiting: "amber",
@@ -111,6 +128,7 @@ function QueueColumn({
   onTransition: (q: QueueEntry, s: QueueStatus, station?: QueueStation) => void;
   collapsed?: boolean;
 }) {
+  const { flow, labelOf } = useStationFlow();
   if (entries.length === 0) return null;
   return (
     <div>
@@ -120,7 +138,9 @@ function QueueColumn({
       <div className="card divide-y divide-slate-100">
         {entries.map((q) => {
           const p = patientById.get(q.patient_id);
-          const nextStation = STATION_FLOW[STATION_FLOW.indexOf(q.station) + 1];
+          // A station switched off is skipped: the next one is whatever comes
+          // after this station in the configured flow.
+          const nextStation = flow[flow.indexOf(q.station) + 1];
           return (
             <div key={q.id} className={`flex items-center gap-3 px-4 py-3 ${collapsed ? "opacity-60" : ""}`}>
               <div className="min-w-0 flex-1">
@@ -151,7 +171,7 @@ function QueueColumn({
                   )}
                   {q.status === "in_progress" && nextStation && (
                     <button className="btn-secondary !px-2 !py-1 text-xs" onClick={() => onTransition(q, "in_progress", nextStation)}>
-                      → {titleCase(nextStation)}
+                      → {labelOf(nextStation)}
                     </button>
                   )}
                   <button className="btn-primary !px-2 !py-1 text-xs" onClick={() => onTransition(q, "completed")}>

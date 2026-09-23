@@ -181,8 +181,10 @@ audited, and staff, facility and audit administration are server-side: disabling
 now revokes its refresh tokens and devices rather than relabelling a local row. Patient
 duplicate merge and the conflict-review queue are built.
 
-Still unbuilt in Phase 9: queue-stations configuration, audit-log export, and per-facility
-permission toggles.
+**Every Phase 9 task now has an implementation**, including queue-stations configuration,
+audit-log export and per-facility permission toggles. A facility may only ever *withdraw* a
+permission, never add one, and the withdrawal is enforced on the hub for the endpoints that
+map to a toggleable permission.
 
 An agent must never describe a deferred capability as if it exists, and must not describe a
 built one as missing. Check `devops/change_log/` for the current position.

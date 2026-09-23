@@ -122,6 +122,19 @@ export function permissionsForRoles(roles: Role[]): Set<Permission> {
   return set;
 }
 
-export function can(roles: Role[], permission: Permission): boolean {
+/**
+ * Does any of `roles` grant `permission`?
+ *
+ * `withdrawn` are permissions a facility has switched off for this user's roles
+ * (see `withdrawnPermissions` in app-config.ts). A facility may only ever take a
+ * permission away: the role matrix is the ceiling, never the floor, so this is
+ * applied after the grant rather than before it.
+ */
+export function can(
+  roles: Role[],
+  permission: Permission,
+  withdrawn: readonly Permission[] = [],
+): boolean {
+  if (withdrawn.includes(permission)) return false;
   return roles.some((r) => (ROLE_PERMISSIONS[r] ?? NONE).includes(permission));
 }

@@ -13,12 +13,19 @@
  * through the outbox.
  */
 import { z } from "zod";
-import { ANTIGENS, ANC_MODELS } from "./enums";
+import { ANTIGENS, ANC_MODELS, QUEUE_STATIONS, ROLES } from "./enums";
+import { PERMISSIONS, type Permission } from "./permissions";
+import type { Role } from "./enums";
 import { DEFAULT_EPI_SCHEDULE, type ImmunizationSchedule } from "./immunization-schedule";
 import { ANC_MODEL_ITEMS, type AncModelItem } from "./anc-model";
 
 /** Config keys the hub stores and the device caches. */
-export const CONFIG_KEYS = ["immunization_schedule", "anc_model"] as const;
+export const CONFIG_KEYS = [
+  "immunization_schedule",
+  "anc_model",
+  "queue_stations",
+  "facility_permissions",
+] as const;
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
 
 // ---- Immunization schedule ----
@@ -106,16 +113,126 @@ export interface AncModelConfig {
   items: AncModelItem[];
 }
 
+// ---- Queue stations ----
+
+/**
+ * Stations are **relabelled, reordered, and switched off** through config, not
+ * invented. `QueueStation` is a typed enum stored on every queue row, so a
+ * genuinely new station would need a code change and a local-store migration.
+ *
+ * What a PHC actually needs is covered: one with no pharmacy switches it off,
+ * one that calls vitals something else relabels it. Recorded as a deliberate
+ * limit rather than presented as full freedom.
+ */
+export const queueStationSchema = z.object({
+  key: z.enum(QUEUE_STATIONS),
+  label: z.string().min(1).max(40),
+  order: z.number().int().min(0).max(50),
+  active: z.boolean(),
+});
+
+export const queueStationsConfigSchema = z
+  .object({ stations: z.array(queueStationSchema).min(1) })
+  .superRefine((config, ctx) => {
+    const keys = config.stations.map((s) => s.key);
+    if (new Set(keys).size !== keys.length) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["stations"], message: "Each station may appear once" });
+    }
+    // Every known station must be present, even if switched off: a queue row
+    // already recorded at a missing station would have nowhere to belong.
+    for (const known of QUEUE_STATIONS) {
+      if (!keys.includes(known)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["stations"],
+          message: `Station "${known}" cannot be removed; switch it off instead`,
+        });
+      }
+    }
+    if (!config.stations.some((s) => s.active)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["stations"], message: "At least one station must stay active" });
+    }
+  });
+
+export interface QueueStationConfig {
+  stations: { key: (typeof QUEUE_STATIONS)[number]; label: string; order: number; active: boolean }[];
+}
+
+const DEFAULT_STATION_LABELS: Record<(typeof QUEUE_STATIONS)[number], string> = {
+  registration: "Registration",
+  vitals: "Vitals",
+  consultation: "Consultation",
+  pharmacy: "Pharmacy",
+};
+
+export const DEFAULT_QUEUE_STATIONS: QueueStationConfig = {
+  stations: QUEUE_STATIONS.map((key, index) => ({
+    key,
+    label: DEFAULT_STATION_LABELS[key],
+    order: index,
+    active: true,
+  })),
+};
+
+/** Active stations, in the configured order. The queue flow follows this. */
+export function activeStations(config: QueueStationConfig) {
+  return [...config.stations].filter((s) => s.active).sort((a, b) => a.order - b.order);
+}
+
+// ---- Per-facility permission toggles ----
+
+/**
+ * A facility may **withdraw** a permission from a role, never add one.
+ *
+ * `rbac-and-scope.md` section 3: per-facility permissions "can never exceed the
+ * role matrix". So this is a deny list, not a grant list. A PHC with no
+ * prescribing cover switches `prescribe` off for its nurses; nothing here can
+ * give a clerk a clinical permission the matrix withholds.
+ */
+export const facilityPermissionsConfigSchema = z.object({
+  facilities: z.record(
+    z.string().min(1),
+    z.record(z.enum(ROLES), z.array(z.enum(PERMISSIONS))),
+  ),
+});
+
+export interface FacilityPermissionsConfig {
+  /** facilityId -> role -> permissions withdrawn at that facility. */
+  facilities: Record<string, Partial<Record<Role, Permission[]>>>;
+}
+
+export const DEFAULT_FACILITY_PERMISSIONS: FacilityPermissionsConfig = { facilities: {} };
+
+/** Permissions withdrawn from `roles` at `facilityId`. */
+export function withdrawnPermissions(
+  config: FacilityPermissionsConfig,
+  facilityId: string | null,
+  roles: Role[],
+): Permission[] {
+  if (!facilityId) return [];
+  const forFacility = config.facilities?.[facilityId];
+  if (!forFacility) return [];
+  const denied = new Set<Permission>();
+  for (const role of roles) {
+    for (const permission of forFacility[role] ?? []) denied.add(permission);
+  }
+  return [...denied];
+}
+
 // ---- The config bundle a device caches ----
 
 export interface AppClinicalConfig {
   immunization_schedule: ImmunizationSchedule;
   anc_model: AncModelConfig;
+  queue_stations: QueueStationConfig;
+  facility_permissions: FacilityPermissionsConfig;
 }
 
 export const DEFAULT_CLINICAL_CONFIG: AppClinicalConfig = {
   immunization_schedule: DEFAULT_EPI_SCHEDULE,
   anc_model: { model: "who_2016_8", items: ANC_MODEL_ITEMS.who_2016_8 },
+  queue_stations: DEFAULT_QUEUE_STATIONS,
+  facility_permissions: DEFAULT_FACILITY_PERMISSIONS,
 };
 
 /** Validate a config value for `key`. Returns the parsed value or the issues. */
@@ -125,7 +242,14 @@ export function validateConfig(
 ):
   | { ok: true; value: AppClinicalConfig[ConfigKey] }
   | { ok: false; issues: { field: string; issue: string }[] } {
-  const schema = key === "immunization_schedule" ? immunizationScheduleSchema : ancModelConfigSchema;
+  const schema =
+    key === "immunization_schedule"
+      ? immunizationScheduleSchema
+      : key === "anc_model"
+        ? ancModelConfigSchema
+        : key === "queue_stations"
+          ? queueStationsConfigSchema
+          : facilityPermissionsConfigSchema;
   const parsed = schema.safeParse(value);
   if (parsed.success) {
     return { ok: true, value: parsed.data as AppClinicalConfig[ConfigKey] };

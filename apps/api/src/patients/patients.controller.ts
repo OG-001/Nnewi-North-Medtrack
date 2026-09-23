@@ -3,6 +3,7 @@ import { PatientsService } from "./patients.service";
 import { PatientMergeService } from "./merge.service";
 import { mergeSchema, type MergeDto } from "./merge.dto";
 import { ZodValidationPipe } from "../common/zod.pipe";
+import { FacilityPermissionsService } from "../common/facility-permissions.service";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { Roles } from "../common/decorators/roles.decorator";
 import type { Principal } from "../common/principal";
@@ -12,6 +13,7 @@ export class PatientsController {
   constructor(
     private readonly patients: PatientsService,
     private readonly merges: PatientMergeService,
+    private readonly permissions: FacilityPermissionsService,
   ) {}
 
   /**
@@ -27,10 +29,11 @@ export class PatientsController {
 
   @Roles("facility_admin")
   @Post("merge")
-  merge(
+  async merge(
     @CurrentUser() user: Principal,
     @Body(new ZodValidationPipe(mergeSchema)) dto: MergeDto,
   ) {
+    await this.permissions.assert(user, "patient.merge");
     return this.merges.merge(user, {
       survivingId: dto.surviving_id,
       mergedId: dto.merged_id,

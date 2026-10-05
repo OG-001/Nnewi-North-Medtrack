@@ -153,6 +153,8 @@ running hub. A device with no hub configured still relies on layers 1 and 2 alon
 ## 8. Git baseline
 
 - Remote: `github.com/OG-001/Nnewi-North-Medtrack`. Default branch: `main`.
+- **Commit identity is `OG-001 <og.eleodimuo@gmail.com>`**, set per clone, never inherited
+  from the global git config. Check it with `git var GIT_AUTHOR_IDENT` before committing.
 - Feature work uses `feature/<feature-name>`; phase work may use `phase-<n>-<short-title>`.
 - **Never commit directly to `main`.**
 - Full workflow in [`concurrent-sessions.md`](concurrent-sessions.md) and the `git-workflow`

@@ -37,6 +37,39 @@ one session's uncommitted work can be swept into the other's commit or wiped ent
 
 ---
 
+## Commit identity
+
+**Check `git var GIT_AUTHOR_IDENT` before your first commit in a session.** It must read
+`OG-001 <og.eleodimuo@gmail.com>`.
+
+Authorship and push access are unrelated in git. The author comes from `user.email`; the
+token only decides whether the push is permitted. GitHub then attributes a commit by
+matching the author email against the verified emails on an account. So a wrong identity
+pushes perfectly successfully and shows up under someone else's name, which is why it goes
+unnoticed.
+
+That is not hypothetical here. A global `user.email` of `arik.ziemba@gmail.com` stamped 16
+commits as the unrelated account `Arek-Oge`, 8 of them published, and correcting it needed a
+history rewrite and a force push over published commits.
+
+| Layer                        | Covers                                      |
+|------------------------------|---------------------------------------------|
+| `git config --local`         | This clone                                  |
+| `.githooks/pre-commit`       | Refuses a commit with the wrong author email |
+
+The hook is tracked, but `core.hooksPath` is local config, so a fresh clone needs this once:
+
+```bash
+git config --local user.name "OG-001"
+git config --local user.email "og.eleodimuo@gmail.com"
+git config --local core.hooksPath .githooks
+```
+
+Never fix a wrong identity by changing the global config. Other projects on this machine
+legitimately use a different account.
+
+---
+
 ## Branch discipline
 
 - Feature branches: `feature/<feature-name>`.

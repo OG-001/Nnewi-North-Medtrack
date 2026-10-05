@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Refuse a commit stamped with the wrong author identity.
+#
+# WHY THIS EXISTS. Commit authorship and push credentials are two unrelated
+# things in git. Authorship comes from user.email; the token only decides
+# whether the push is allowed. On 2026-09-23 a global user.email of
+# arik.ziemba@gmail.com stamped 16 commits as the account Arek-Oge, which has
+# nothing to do with this project. Nobody noticed until they appeared on
+# GitHub, because every push succeeded. Repairing it needs a history rewrite
+# and a force push over published commits.
+#
+# A repository-local user.email prevents it, but only until something clears
+# it: a fresh clone, a `git config --local --unset`, or a reinstall. This hook
+# is the part that cannot be forgotten.
+set -euo pipefail
+
+EXPECTED_EMAIL="og.eleodimuo@gmail.com"
+EXPECTED_NAME="OG-001"
+
+# GIT_AUTHOR_IDENT resolves the identity this commit will actually carry,
+# honouring env overrides and the config precedence chain, so it is the real
+# value rather than whatever one config scope happens to say.
+ident="$(git var GIT_AUTHOR_IDENT)"
+email="${ident##*<}"; email="${email%%>*}"
+name="${ident%% <*}"
+
+if [ "$email" != "$EXPECTED_EMAIL" ]; then
+  cat >&2 <<MSG
+
+COMMIT REFUSED: wrong author identity.
+
+  this commit would be authored by: ${name} <${email}>
+  this project requires:            ${EXPECTED_NAME} <${EXPECTED_EMAIL}>
+
+GitHub attributes a commit by matching the author email to a verified account
+email, so committing as <${email}> credits the wrong account. The push would
+still succeed, which is exactly why this goes unnoticed.
+
+Fix it for this repository only, leaving your global default alone:
+
+  git config --local user.name "${EXPECTED_NAME}"
+  git config --local user.email "${EXPECTED_EMAIL}"
+
+Then commit again. To amend the commit you just tried to make instead:
+
+  git commit --amend --reset-author
+
+MSG
+  exit 1
+fi
+
+if [ "$name" != "$EXPECTED_NAME" ]; then
+  echo "WARNING: author name is '${name}', expected '${EXPECTED_NAME}'." >&2
+  echo "         The email is right so GitHub will attribute this correctly," >&2
+  echo "         but set user.name too:  git config --local user.name \"${EXPECTED_NAME}\"" >&2
+fi

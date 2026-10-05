@@ -124,10 +124,17 @@ Violating any of these is a CRITICAL finding that blocks merge.
 13. **Record every change** in `devops/change_log/YYYY/MM/`.
 14. **Everything is strictly typed.** No `any`, no non-null assertion used to silence the
     compiler, no `@ts-ignore` without a cited reason on the line above.
+15. **Commit as `OG-001 <og.eleodimuo@gmail.com>`.** Verify before every commit with
+    `git var GIT_AUTHOR_IDENT`. Never rely on the global git identity: on this machine it
+    is a different account, and it silently mis-attributed 16 commits. Commit authorship
+    comes from `user.email` and has nothing to do with the push credential, so a wrong
+    identity still pushes successfully and is only visible afterwards on GitHub.
 
 Constraints 1, 2, 3, and 10 are additionally enforced deterministically by
 [`.claude/hooks/safety-gate.sh`](.claude/hooks/safety-gate.sh). Keep that hook aligned with
-this list.
+this list. Constraint 15 is enforced by the git hook
+[`.githooks/pre-commit`](.githooks/pre-commit), which needs
+`git config --local core.hooksPath .githooks` once per clone.
 
 ---
 

@@ -162,6 +162,74 @@ and `packages/shared`.
 > **If any later command fails with "cannot find module", run `pnpm install`
 > from the repository root first.** That is the single most common cause.
 
+### 6a. Set the commit identity before your first commit
+
+Do this immediately after cloning. Skipping it is not harmless, and the damage is
+invisible until someone reads the history on GitHub.
+
+Commit authorship and push access are unrelated in git. The author comes from
+`user.email`; your credential only decides whether the push is allowed. GitHub then
+credits the commit to whichever account has that email verified. So a wrong identity
+pushes successfully and quietly credits the wrong person. It happened on this project:
+a global `user.email` stamped 16 commits onto an unrelated account, and repairing it
+needed a history rewrite and a force push over published commits.
+
+```bash
+git config --local user.name "OG-001"
+git config --local user.email "og.eleodimuo@gmail.com"
+git config --local core.hooksPath .githooks
+```
+
+Use `--local`, never `--global`. A machine may host other projects that legitimately
+commit as a different account.
+
+The third line arms `.githooks/pre-commit`, which refuses a commit carrying the wrong
+author email. The hook is version-controlled, but `core.hooksPath` is local config, so
+it stays dormant until you set it. Verify:
+
+```bash
+git var GIT_AUTHOR_IDENT     # must show OG-001 <og.eleodimuo@gmail.com>
+```
+
+### 6b. Authenticate pushes with SSH, not a token
+
+SSH is preferred here. Nothing expires, no secret sits in a file, and no token can leak
+through a shell history or a transcript.
+
+If the machine's default SSH key already belongs to a different GitHub account, do not
+try to reuse it. A key can exist on only one account. Generate a second one and select
+it with a host alias:
+
+```bash
+ssh-keygen -t ed25519 -C "OG-001 phc-track" -f ~/.ssh/id_ed25519_og001 -N ""
+cat ~/.ssh/id_ed25519_og001.pub
+```
+
+Add that public key while signed in as the correct account, under
+**Settings, SSH and GPG keys, New SSH key**, leaving the type as **Authentication Key**.
+Paste the whole `ssh-ed25519 ...` line. The `SHA256:` fingerprint is for comparison
+only and is never pasted.
+
+Then add this to `~/.ssh/config`, which must be mode 600:
+
+```
+Host github-og001
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_ed25519_og001
+  IdentitiesOnly yes
+```
+
+Point the clone at the alias and confirm the identity before you push anything:
+
+```bash
+git remote set-url origin git@github-og001:OG-001/Nnewi-North-Medtrack.git
+ssh -T git@github-og001          # must answer: Hi OG-001!
+```
+
+If that answers with a different account name, the alias is not being used. Fix it
+before committing, not after.
+
 ---
 
 ## 7. Step 6: Configure the hub

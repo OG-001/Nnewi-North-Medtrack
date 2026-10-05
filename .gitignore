@@ -20,6 +20,9 @@ test-results/
 # version-controlled on purpose: the agent system travels with the repository.
 .claude/session-git-locks.json
 .claude/sessions/
+# Machine-local permission grants. These authorise commands on one developer's
+# machine, so they are not a project decision and must not travel in the repo.
+.claude/settings.local.json
 
 # Local demo credentials — never committed (governance: no secrets in the repo).
 credentials.md

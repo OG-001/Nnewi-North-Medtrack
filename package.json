@@ -19,6 +19,7 @@
     "db:migrate": "pnpm --filter @phc/api prisma:migrate",
     "db:deploy": "pnpm --filter @phc/api exec prisma migrate deploy",
     "db:seed": "pnpm --filter @phc/api seed",
+    "db:bootstrap-admin": "pnpm --filter @phc/api exec tsx prisma/bootstrap-admin.ts",
     "e2e": "pnpm --filter @phc/web e2e",
     "test:all": "pnpm test && pnpm e2e"
   },

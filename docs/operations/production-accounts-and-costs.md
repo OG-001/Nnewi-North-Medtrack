@@ -324,8 +324,24 @@ Each step depends on the one before it.
 6. **Deploy the app to Pages** and point it at the hub.
 7. **Build the backup host**, then **rehearse a restore**. Until a restore has been
    completed and verified, treat the deployment as having no backup.
-8. **Provision real staff accounts** through the admin screens, where each person chooses
-   their own PIN.
+8. **Create the first administrator**, then **provision real staff** through the admin
+   screens, where each person chooses their own PIN.
+
+   A freshly seeded database has no users at all, because the demo accounts are skipped.
+   Staff creation requires an administrator to be signed in, so there is a one-shot script
+   to break that deadlock:
+
+   ```bash
+   DATABASE_URL="<pooled>" \
+   BOOTSTRAP_ADMIN_USERNAME="your.name" \
+   BOOTSTRAP_ADMIN_PIN="<8 to 12 characters>" \
+     pnpm db:bootstrap-admin
+   ```
+
+   It refuses to run once any user exists, so it cannot be used later to add a second
+   platform-wide administrator. The PIN comes from the environment rather than an argument,
+   so it stays out of shell history. Sign in as that account, create the per-facility
+   admins, and then keep it for break-glass use rather than daily work.
 
 Steps 7 and 8 are the ones most likely to be skipped under time pressure. Step 7 is what
 stands between you and permanent data loss. Step 8 is what stands between the system and

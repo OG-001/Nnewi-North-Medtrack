@@ -71,12 +71,21 @@ reach the direct endpoint cannot alter the schema even if it is compromised.
    across every facility in the LGA. The script prints which parts it ran, so read its
    output rather than assuming.
 
-   Provision real staff through the admin screens, where the account holder chooses their
-   own PIN. Never set `SEED_DEMO_USERS=true` against a database that will hold real patient
-   records.
-4. Set the two secrets above.
-5. `npm run deploy` from this directory.
-6. Confirm the hub answers: `GET https://<worker>/api/v1/system/health`.
+   Never set `SEED_DEMO_USERS=true` against a database that will hold real patient records.
+
+4. Create the first administrator, since the seeded database has no users and staff
+   creation needs one signed in:
+
+   ```bash
+   BOOTSTRAP_ADMIN_USERNAME="your.name" BOOTSTRAP_ADMIN_PIN="<8 to 12 chars>" \
+     pnpm db:bootstrap-admin
+   ```
+
+   Then provision real staff through the admin screens, where each account holder chooses
+   their own PIN.
+5. Set the two secrets above.
+6. `npm run deploy` from this directory.
+7. Confirm the hub answers: `GET https://<worker>/api/v1/system/health`.
 
 ## Known gaps
 

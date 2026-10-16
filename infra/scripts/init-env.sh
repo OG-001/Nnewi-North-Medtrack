@@ -68,6 +68,11 @@ if [ "$MODE" = "dev" ]; then
 
 # Matches the development stack in infra/docker-compose.yml.
 DATABASE_URL="postgresql://phc:phc_dev_only@localhost:${DB_PORT}/phc_track?schema=public"
+# Migrations need a session-level connection, so they use their own URL. On this
+# local stack there is no connection pooler, so the two are identical. Against a
+# managed Postgres they differ: DATABASE_URL is the pooled endpoint and this one
+# bypasses the pooler.
+DIRECT_DATABASE_URL="postgresql://phc:phc_dev_only@localhost:${DB_PORT}/phc_track?schema=public"
 
 JWT_SECRET="$(secret)"
 ACCESS_TOKEN_TTL="15m"

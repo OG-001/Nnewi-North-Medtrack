@@ -1,0 +1,74 @@
+// Cloudflare Containers deployment for the PHC-Track sync hub.
+//
+// NOT YET DEPLOYED OR EXERCISED. Written from Cloudflare's documentation; no
+// account has run it. Treat every value as needing confirmation on the first
+// deploy, and expect to adjust instance_type once you have seen real memory use.
+//
+// WHY A CONTAINER AND NOT A WORKER. The hub is NestJS on Express and hashes
+// every staff PIN with argon2, a compiled native module. Cloudflare lists
+// native addons and Node's http module as unsupported in Workers, so the hub
+// cannot run there without replacing both its web framework and its password
+// hashing. A container runs the ordinary Node process unchanged.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "phc-track-hub",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  "containers": [
+    {
+      "class_name": "PhcHub",
+      "image": "../Dockerfile.api",
+      "image_build_context": "../..",
+
+      // "lite" is the default at 1/16 vCPU and 256 MiB. That will not hold a
+      // NestJS process. standard-1 is a starting point, not a measured figure:
+      // check actual memory use after the first deploy and size to it.
+      "instance_type": "standard-1",
+
+      // The hub is stateless; all state is in Postgres. More instances are
+      // therefore safe, but each one opens its own connection pool, so this
+      // number and the database's connection limit have to be considered
+      // together.
+      "max_instances": 3,
+
+      // Keep compute in the same jurisdiction as the database, which sits in
+      // Neon's Frankfurt region. Without this, Cloudflare runs the container
+      // nearest the request, so a push from Nnewi could land in a container in
+      // Africa or Europe while the database stays in Frankfurt, and every query
+      // in a sync cycle would pay that distance.
+      //
+      // "eu" maps to EEUR and WEUR. Cloudflare rejects a config that pairs this
+      // jurisdiction with a non-European region, so a mistake fails the deploy
+      // instead of quietly misplacing patient data.
+      "constraints": { "jurisdiction": "eu" },
+
+      // Replace instances in two steps rather than all at once, so a bad image
+      // cannot take the whole hub down. Devices retry, but a total outage during
+      // a clinic session is still worth avoiding.
+      "rollout_step_percentage": [10, 100]
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [{ "name": "PHC_HUB", "class_name": "PhcHub" }]
+  },
+
+  "exports": {
+    "PhcHub": { "type": "durable-object", "storage": "sqlite" }
+  }
+
+  // SECRETS ARE NOT LISTED HERE. This file is committed, so it must never carry
+  // DATABASE_URL, DIRECT_DATABASE_URL or JWT_SECRET (Global Constraint 2). Set
+  // them once per environment with:
+  //
+  //   npx wrangler secret put DATABASE_URL
+  //   npx wrangler secret put JWT_SECRET
+  //
+  // DIRECT_DATABASE_URL is deliberately NOT given to the Worker at all. The hub
+  // never migrates; migrations run from CI or an operator machine via
+  // `pnpm db:deploy`. Withholding it means a compromised hub cannot alter the
+  // schema.
+}

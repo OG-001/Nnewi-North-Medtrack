@@ -34,7 +34,25 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3000/api/v1/system/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-# Migrations are applied on start so a fresh volume comes up ready. This is
-# `migrate deploy`, which only applies committed migrations and never generates
-# or resets one.
-CMD ["sh", "-c", "cd apps/api && npx prisma migrate deploy && node dist/src/main.js"]
+# Migrations are NOT applied on start by default.
+#
+# They used to be, so a fresh volume came up ready. That is safe for exactly one
+# always-on container and unsafe everywhere else:
+#
+#   - Several instances starting together race each other on the same database.
+#     Prisma takes an advisory lock, so one wins and the rest block, turning a
+#     cold start into a timeout.
+#   - On a platform whose instances wake on demand, this runs on every wake, so
+#     the cost is paid forever rather than once.
+#   - It needs a session-level connection. A hub pointed at a pooled endpoint
+#     cannot migrate through it at all.
+#
+# Apply migrations as a deliberate deployment step instead, from CI or an
+# operator machine, against DIRECT_DATABASE_URL:
+#
+#   pnpm db:deploy
+#
+# Set RUN_MIGRATIONS_ON_START=true to restore the old behaviour. It is there for
+# a single-container local stack, where the race cannot happen. Never set it on
+# a multi-instance deployment.
+CMD ["sh", "-c", "cd apps/api &&   if [ "$RUN_MIGRATIONS_ON_START" = "true" ]; then npx prisma migrate deploy; fi &&   node dist/src/main.js"]

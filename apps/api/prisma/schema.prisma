@@ -13,7 +13,19 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // DATABASE_URL is the POOLED endpoint, used by the running hub. A managed
+  // Postgres puts a connection pooler in front, which is what makes a hub that
+  // wakes and sleeps affordable: each wake would otherwise open a fresh set of
+  // server-side connections and exhaust the limit.
   url      = env("DATABASE_URL")
+  // DIRECT_DATABASE_URL bypasses the pooler. Migrations need a session-level
+  // connection: they take advisory locks and run statements a transaction-mode
+  // pooler will not carry, so running them through the pooled endpoint fails in
+  // ways that look like corruption rather than a clear error.
+  //
+  // Point both at the same database. On a single-node Postgres with no pooler,
+  // set them to the same value.
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 /// Facilities are hub-authoritative config (offline-sync-design §5).

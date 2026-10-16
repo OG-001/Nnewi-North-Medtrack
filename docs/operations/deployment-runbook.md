@@ -23,6 +23,7 @@ Do not start until all of these are true.
 | Igbo SMS templates reviewed by a native speaker | Patients read them |
 | `infra/.env` filled, every REQUIRED value set | The stack refuses to start otherwise |
 | `bash infra/scripts/secret-scan.sh` clean | No credential in the repo |
+| No demo staff account exists on the target | `sysadmin`/`0000` is published in `RUNNING.md` |
 | DNS points at the host | Caddy needs it to obtain a certificate |
 
 ### Hosting: a Nigerian VPS, not on-premises at the LGA

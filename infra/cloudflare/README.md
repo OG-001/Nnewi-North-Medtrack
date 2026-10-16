@@ -64,6 +64,16 @@ reach the direct endpoint cannot alter the schema even if it is compromised.
    afterwards on Neon, so this is a one-way door.
 2. Apply the schema from your machine against the direct endpoint: `pnpm db:deploy`.
 3. Load the facility registry: `pnpm db:seed`.
+
+   This seeds the facility registry **only** when `DATABASE_URL` is not a local host. The
+   demo staff accounts are skipped, and that is deliberate: their PINs are four digits,
+   published in `RUNNING.md`, and include `sysadmin` with PIN `0000` holding `system_admin`
+   across every facility in the LGA. The script prints which parts it ran, so read its
+   output rather than assuming.
+
+   Provision real staff through the admin screens, where the account holder chooses their
+   own PIN. Never set `SEED_DEMO_USERS=true` against a database that will hold real patient
+   records.
 4. Set the two secrets above.
 5. `npm run deploy` from this directory.
 6. Confirm the hub answers: `GET https://<worker>/api/v1/system/health`.

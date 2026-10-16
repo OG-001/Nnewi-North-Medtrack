@@ -1,13 +1,31 @@
 # Dev / self-host stack. The PWA is fully usable on its own (offline-first);
 # the api service is the NestJS sync hub that reconciles devices (Phase 3).
 # Run from the repo root:  docker compose -f infra/docker-compose.yml up --build
+#
+# Every HOST port below is overridable, because a machine that already runs
+# another stack will have some of these taken, and a hardcoded mapping makes the
+# whole file unusable rather than just inconvenient. Container-internal ports are
+# deliberately NOT parameterised: services address each other over the compose
+# network, so those must stay fixed.
+#
+#   PHC_WEB_PORT    default 8080
+#   PHC_DB_PORT     default 5432
+#   PHC_REDIS_PORT  default 6379
+#   PHC_API_PORT    default 3000
+#
+# Example, on a machine where 5432 and 3000 are already in use:
+#   PHC_DB_PORT=55432 PHC_API_PORT=3100 \
+#     docker compose -f infra/docker-compose.yml up -d postgres
+#
+# Keep PHC_DB_PORT and PHC_API_PORT in step with DATABASE_URL and PORT in
+# apps/api/.env, which infra/scripts/init-env.sh writes from the same values.
 services:
   web:
     build:
       context: ..
       dockerfile: infra/Dockerfile.web
     ports:
-      - "8080:80"
+      - "${PHC_WEB_PORT:-8080}:80"
     restart: unless-stopped
 
   postgres:
@@ -17,7 +35,7 @@ services:
       POSTGRES_PASSWORD: phc_dev_only
       POSTGRES_DB: phc_track
     ports:
-      - "5432:5432"
+      - "${PHC_DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
@@ -25,7 +43,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${PHC_REDIS_PORT:-6379}:6379"
     restart: unless-stopped
 
   api:
@@ -38,10 +56,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-min-32-chars-long}
       ACCESS_TOKEN_TTL: 15m
       REFRESH_TOKEN_TTL_DAYS: 30
-      CORS_ORIGINS: http://localhost:8080,http://localhost:5173
+      CORS_ORIGINS: http://localhost:${PHC_WEB_PORT:-8080},http://localhost:5173
       PORT: 3000
     ports:
-      - "3000:3000"
+      - "${PHC_API_PORT:-3000}:3000"
     depends_on:
       - postgres
       - redis

@@ -104,7 +104,12 @@ EOF
   echo "  2. pnpm db:migrate && pnpm db:seed"
   echo "  3. pnpm dev:api        (terminal 1)"
   echo "  4. VITE_API_BASE_URL=http://localhost:${API_PORT}/api/v1 pnpm dev   (terminal 2)"
-  [ "$DB_PORT" != "5432" ] && echo "  Note: using database port $DB_PORT. Match it in infra/docker-compose.yml."
+  if [ "$DB_PORT" != "5432" ] || [ "$API_PORT" != "3000" ]; then
+    echo
+    echo "  Non-default ports. Pass them to compose rather than editing the file:"
+    echo "    PHC_DB_PORT=$DB_PORT PHC_API_PORT=$API_PORT \\"
+    echo "      docker compose -f infra/docker-compose.yml up -d postgres"
+  fi
   exit 0
 fi
 

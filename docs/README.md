@@ -19,6 +19,7 @@ silently.
 | Run it and see the demo | [`../RUNNING.md`](../RUNNING.md) |
 | Understand what it is and why | [`master-plan.md`](master-plan.md) |
 | Deploy it to the pilot server | [`operations/deployment-runbook.md`](operations/deployment-runbook.md) |
+| Know what to buy, and what it costs | [`operations/production-accounts-and-costs.md`](operations/production-accounts-and-costs.md) |
 
 ---
 
@@ -48,6 +49,7 @@ silently.
 | [`operations/environment-setup.md`](operations/environment-setup.md) | Every dependency, step by step, from a bare machine |
 | [`operations/deployment-runbook.md`](operations/deployment-runbook.md) | Deploying, upgrading, rolling back, the pilot |
 | [`operations/backup-and-restore.md`](operations/backup-and-restore.md) | Encrypted backups and rehearsing a restore |
+| [`operations/production-accounts-and-costs.md`](operations/production-accounts-and-costs.md) | Every account to create, the links, what to copy, and the cost |
 | [`operations/observability.md`](operations/observability.md) | Health endpoints and what is worth an alert |
 | [`operations/incident-response.md`](operations/incident-response.md) | A breach or a lost device, and the 72-hour clock |
 | [`operations/records-of-processing.md`](operations/records-of-processing.md) | Controller, DPO, retention, what data goes where |

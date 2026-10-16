@@ -56,10 +56,9 @@ describe.skipIf(!hubUp)("deployment accountability", () => {
   it("carries no patient data", async () => {
     const body = (await (await fetch(`${API}/system/compliance`)).json()) as Record<string, unknown>;
 
-    // Asserted on the shape, not on prose: the endpoint's own text mentions
-    // "patient data" in describing residency, which a keyword scan would flag.
+    // Asserted on the shape, not on prose, so a wording change does not fail it.
     expect(Object.keys(body).sort()).toEqual(
-      ["controller", "dpo", "features", "legal_basis", "residency", "retention"].sort(),
+      ["controller", "dpo", "features", "legal_basis", "retention"].sort(),
     );
 
     const text = JSON.stringify(body);
@@ -81,11 +80,25 @@ describe.skipIf(!hubUp)("deployment accountability", () => {
     expect(body.retention.note).toContain("never hard-deleted");
   });
 
-  it("reports data residency as Nigeria", async () => {
-    const body = (await (await fetch(`${API}/system/compliance`)).json()) as {
-      residency: { country: string };
-    };
-    expect(body.residency.country).toBe("Nigeria");
+  // Guards a deliberate removal. The endpoint used to assert that data stayed in
+  // Nigeria. Hosting moved, so that became a false public statement about
+  // sensitive health data, and a stale residency claim is worse than none. Where
+  // processing happens is recorded in docs/operations/records-of-processing.md
+  // and, where a data subject must be told, in the controller's privacy notice.
+  it("publishes no hosting-location claim", async () => {
+    const body = (await (await fetch(`${API}/system/compliance`)).json()) as Record<
+      string,
+      unknown
+    >;
+    expect(body).not.toHaveProperty("residency");
+
+    // Nor smuggled into any other field's prose.
+    const text = JSON.stringify(body);
+    // Not a bare "Nigeria": legal_basis legitimately names the Nigeria Data
+    // Protection Act, which is the governing law, not a hosting claim.
+    for (const phrase of ["do not leave", "does not leave", "Self-hosted", "residency"]) {
+      expect(text).not.toContain(phrase);
+    }
   });
 });
 

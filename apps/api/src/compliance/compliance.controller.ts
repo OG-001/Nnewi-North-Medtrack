@@ -12,6 +12,18 @@ import { Public } from "../common/decorators/roles.decorator";
  *
  * It reads from the environment rather than from code, because the controller
  * and DPO change with the post, not with a release.
+ *
+ * DELIBERATELY ABSENT: hosting location. This endpoint previously asserted that
+ * data stayed in Nigeria, which stopped being true when hosting moved off a
+ * Nigerian VPS. A stale residency claim about sensitive health data is worse
+ * than no claim, so it is not published here at all. Infrastructure placement
+ * is an operational detail, and the factual record of where processing happens
+ * belongs in `docs/operations/records-of-processing.md`, the DPO's artifact,
+ * not in an API response that drifts out of date on the next migration.
+ *
+ * Do not reintroduce a `residency` field. If a data subject has to be told
+ * about cross-border transfer, that belongs in the privacy notice the
+ * controller issues, which can be kept current by a human.
  */
 @Controller("system")
 export class ComplianceController {
@@ -26,10 +38,6 @@ export class ComplianceController {
       dpo: {
         name: this.config.get("PHC_DPO_NAME") || notSet,
         contact: this.config.get("PHC_DPO_CONTACT") || notSet,
-      },
-      residency: {
-        country: "Nigeria",
-        note: "Self-hosted in Nigeria. Patient data and its backups do not leave the country.",
       },
       retention: {
         general_years: Number(this.config.get("PHC_RETENTION_GENERAL_YEARS") ?? 10),

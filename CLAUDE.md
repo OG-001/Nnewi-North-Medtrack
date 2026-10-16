@@ -73,7 +73,7 @@ wants to change one of these must stop and raise it with the owner.
 | Backend             | NestJS REST API, modular monolith, Redis and BullMQ for jobs |
 | Database            | PostgreSQL, per-facility device store plus a central hub     |
 | Monorepo            | pnpm workspaces: `apps/*` and `packages/*`                   |
-| Hosting             | Dockerized and self-hosted; patient data stays in Nigeria    |
+| Hosting             | Dockerized; location is a deployment decision, never in code |
 | SMS                 | Provider-agnostic, with Africa's Talking and Termii adapters |
 | Reporting target    | NHMIS-aligned monthly summaries, exportable to DHIS2         |
 | Compliance baseline | Nigeria Data Protection Act 2023, NPHCDA primary care norms  |
@@ -177,6 +177,11 @@ Phases 7 (SMS) and 8 (reporting) are built. Phase 10's **engineering** deliverab
 built: production compose, TLS, hardened images, security headers, encrypted backups with a
 rehearsed restore, readiness and metrics endpoints, a secret scanner, and the runbooks in
 `docs/operations/`.
+
+**Hosting superseded 2026-10-16:** the Nigerian-VPS decision of 2026-09-23 was reversed by
+the owner, and the data-residency claim was removed from the public compliance endpoint
+rather than restated. Never assert a hosting location in code or in an API response. See
+[`ndpa-compliance.md`](.claude/rules/ndpa-compliance.md) section 1.
 
 **Deployment decisions taken 2026-09-23:** hosting is a Nigerian VPS (Q6 closed), the data
 controller and DPO are named in `infra/.env` and served by `GET /system/compliance` (Q9

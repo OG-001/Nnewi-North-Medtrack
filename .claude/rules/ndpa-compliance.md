@@ -23,8 +23,30 @@ data** under the Nigeria Data Protection Act 2023, so this rule has no exempt di
 | Storage limitation    | Configurable retention. Soft delete then archive.         |
 | Confidentiality       | Encryption in transit and at rest, RBAC, least privilege  |
 | Accountability        | Full audit log, named controller and DPO                  |
-| Data residency        | Self-hosted in Nigeria. Data does not leave the country.  |
+| Data residency        | A controller decision, not a code invariant. See below.    |
 | Breach handling       | Detectable through logging, with a documented runbook     |
+
+### Data residency is not a code invariant
+
+This rule used to state that data never leaves Nigeria, and the hub published that
+claim at `GET /api/v1/system/compliance`. The owner reversed the hosting decision on
+2026-10-16, which made the published claim false.
+
+**Never assert a hosting location in code, in an API response, or in the UI.** It is a
+deployment fact that changes without any code change, so anything asserting it goes stale
+silently, and a stale claim about where sensitive health data lives is worse than no
+claim. `apps/api/test/compliance-and-sms-off.test.ts` now fails if a `residency` field
+reappears in that endpoint.
+
+Where processing actually happens is recorded in
+`docs/operations/records-of-processing.md`, which is the DPO's artifact and is maintained
+by a person. Where a data subject must be told about cross-border transfer, that belongs
+in the privacy notice the controller issues.
+
+The Act still constrains the transfer itself: moving personal data outside Nigeria needs a
+lawful basis under its cross-border provisions rather than happening by default. That is
+the controller's and DPO's call to make and record, not something to encode. Raise it,
+do not decide it.
 
 ---
 

@@ -11,7 +11,6 @@ import { API_BASE_URL } from "./api";
 export interface DeploymentInfo {
   controller: string;
   dpo: { name: string; contact: string };
-  residency: { country: string; note: string };
   retention: {
     general_years: number;
     maternity_years: number;
@@ -33,7 +32,6 @@ const CACHE_KEY = "phc-track.deployment";
 const FALLBACK: DeploymentInfo = {
   controller: "Not yet designated",
   dpo: { name: "Not yet designated", contact: "Not yet designated" },
-  residency: { country: "Nigeria", note: "Self-hosted in Nigeria." },
   retention: {
     general_years: 10,
     maternity_years: 25,

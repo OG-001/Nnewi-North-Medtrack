@@ -28,7 +28,12 @@ import type { Actor } from "../db/repository";
 import type { UserAccount } from "../db/types";
 import { newId } from "@phc/shared";
 import { getDeviceId } from "./device";
-import { endHubSession, establishHubSession, primeClinicalConfig } from "./hub-session";
+import {
+  adoptAccountFromHub,
+  endHubSession,
+  establishHubSession,
+  primeClinicalConfig,
+} from "./hub-session";
 import { getWithdrawnPermissions } from "./clinical-config";
 import { loadDeployment } from "./deployment";
 
@@ -101,11 +106,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const uname = username.trim().toLowerCase();
       const candidates = await db.users.where("username").equals(uname).toArray();
       // Scope to the selected facility: the account must be provisioned for it.
-      const u = candidates.find((c) => c.facility_ids.includes(selectedFacilityId));
+      let u = candidates.find((c) => c.facility_ids.includes(selectedFacilityId));
+      let adoptedFromHub = false;
+
+      // First contact. This device holds no account matching that username at
+      // this facility, so ask the hub: it may know an account this device has
+      // never synced, or may have widened an existing one's scope since the
+      // last sync. On success the account is cached locally, so every later
+      // sign-in takes the offline path and never waits on the network again.
+      //
+      // Local is still tried first. The hub is consulted only when the device
+      // genuinely cannot answer, so a working offline sign-in is unaffected.
       if (!u) {
-        return candidates.length
-          ? { ok: false, error: "That account is not provisioned for this facility." }
-          : { ok: false, error: "Unknown username." };
+        const adopted = await adoptAccountFromHub(uname, pin, selectedFacilityId);
+        if (adopted.outcome === "ok") {
+          u = adopted.account;
+          adoptedFromHub = true;
+        } else if (adopted.outcome === "rejected") {
+          // One message for every rejection the hub can give. See
+          // adoptAccountFromHub for why they are not distinguished.
+          return { ok: false, error: "Username or PIN not recognised." };
+        } else {
+          // No hub to ask, so say only what this device can actually assert.
+          return candidates.length
+            ? { ok: false, error: "That account is not provisioned for this facility." }
+            : { ok: false, error: "Unknown username, and the sync hub is unreachable." };
+        }
       }
       if (u.status !== "active") return { ok: false, error: "Account is not active." };
       if (u.pin !== pin) return { ok: false, error: "Incorrect PIN." };
@@ -127,7 +153,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
       // Best-effort: pick up a hub session so this device can sync. Deliberately
       // not awaited — sign-in must not wait on the network (offline-sync §1).
-      void establishHubSession(uname, pin, selectedFacilityId);
+      //
+      // Skipped when the account was just adopted: that path already signed in
+      // to the hub, enrolled the device and synced, so repeating it would mean
+      // a second login and a second full cycle for no gain.
+      if (!adoptedFromHub) void establishHubSession(uname, pin, selectedFacilityId);
 
       return { ok: true };
     },

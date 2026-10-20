@@ -18,21 +18,72 @@ import { DEMO_FACILITY, signOutCompletely } from "./helpers";
 
 const API = process.env.E2E_API_URL ?? "http://localhost:3100/api/v1";
 
-/** A hub-only account the harness provisions. Never in the client seed. */
+/**
+ * A hub-only account, provisioned by this spec rather than by hand.
+ *
+ * It must never appear in the client-side seed, or the tests would pass without
+ * adoption ever happening. The PIN is six digits because that is what the staff
+ * PIN rule allows; see packages/shared/src/pin.ts.
+ */
 const HUB_ONLY_USERNAME = process.env.E2E_HUB_USERNAME ?? "adopt.test";
-const HUB_ONLY_PIN = process.env.E2E_HUB_PIN ?? "adopt99331";
+const HUB_ONLY_PIN = process.env.E2E_HUB_PIN ?? "730194";
+
+/** A seeded administrator, used only to create the fixture above. */
+const ADMIN_USERNAME = process.env.E2E_ADMIN_USERNAME ?? "sysadmin";
+const ADMIN_PIN = process.env.E2E_ADMIN_PIN ?? "0000";
+const FACILITY_ID = process.env.E2E_FACILITY_ID ?? "fac-0062";
 
 let hubUp = false;
 
+/** Sign in to the hub directly, outside the browser. */
+async function hubToken(username: string, pin: string): Promise<string | null> {
+  const res = await fetch(`${API}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, pin, facility_id: FACILITY_ID }),
+  });
+  if (!res.ok) return null;
+  return ((await res.json()) as { accessToken?: string }).accessToken ?? null;
+}
+
 test.beforeAll(async () => {
   try {
-    const res = await fetch(`${API}/system/health`);
-    hubUp = res.ok;
+    hubUp = (await fetch(`${API}/system/health`)).ok;
   } catch {
     hubUp = false;
   }
   if (!hubUp) {
     console.warn(`\nNo hub at ${API} — hub-adoption tests skipped.\n`);
+    return;
+  }
+
+  // Provision the fixture so the suite does not depend on an account somebody
+  // created by hand, which is exactly how it broke the first time.
+  const admin = await hubToken(ADMIN_USERNAME, ADMIN_PIN);
+  if (admin) {
+    await fetch(`${API}/admin/staff`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${admin}` },
+      body: JSON.stringify({
+        username: HUB_ONLY_USERNAME,
+        full_name: "Adopt Test",
+        pin: HUB_ONLY_PIN,
+        roles: ["nurse_midwife"],
+        facility_ids: [FACILITY_ID],
+      }),
+      // A duplicate from a previous run is fine; the check below is what counts.
+    }).catch(() => undefined);
+  }
+
+  // The fixture has to be usable, whether it was just created or already there.
+  // Without this the adoption tests would fail for a reason unrelated to
+  // adoption, which is what happened before.
+  if (!(await hubToken(HUB_ONLY_USERNAME, HUB_ONLY_PIN))) {
+    hubUp = false;
+    console.warn(
+      `\nHub at ${API} has no usable "${HUB_ONLY_USERNAME}" account and it could ` +
+        `not be created (admin "${ADMIN_USERNAME}" unavailable) — tests skipped.\n`,
+    );
   }
 });
 

@@ -10,3 +10,4 @@ export * from "./sync-protocol";
 export * from "./sms";
 export * from "./reporting";
 export * from "./app-config";
+export * from "./pin";

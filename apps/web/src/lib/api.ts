@@ -23,6 +23,8 @@ export class ApiError extends Error {
     readonly code: string,
     message: string,
     readonly status: number,
+    /** Per-field issues, when the hub rejected the body as invalid. */
+    readonly details?: { field: string; issue: string }[],
   ) {
     super(message);
   }
@@ -50,16 +52,37 @@ export function hasHubSession(): boolean {
 async function parseError(res: Response): Promise<ApiError> {
   let code = "INTERNAL";
   let message = res.statusText || "Request failed";
+  let details: { field: string; issue: string }[] | undefined;
   try {
     const body = (await res.json()) as ApiErrorBody;
     if (body?.error) {
       code = body.error.code;
       message = body.error.message;
+      details = body.error.details;
+
+      // A validation failure's `message` is a generic header: the hub sends
+      // "Request body failed validation" and puts the useful part in `details`.
+      // Dropping that is how a clear server message ("PIN must be 4 to 6
+      // digits") reached a form as an opaque 400 that told the user nothing.
+      if (details?.length) {
+        message = details
+          .map((d) => (d.field && d.field !== "(body)" ? `${labelFor(d.field)}: ${d.issue}` : d.issue))
+          .join(" ");
+      }
     }
   } catch {
     /* non-JSON error body — keep the status text */
   }
-  return new ApiError(code, message, res.status);
+  return new ApiError(code, message, res.status, details);
+}
+
+/**
+ * Field names come off the wire in snake_case, which is right for the protocol
+ * and wrong in a sentence shown to a nurse.
+ */
+function labelFor(field: string): string {
+  const leaf = field.split(".").pop() ?? field;
+  return leaf.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 }
 
 async function rawRequest(path: string, init: RequestInit, token?: string): Promise<Response> {

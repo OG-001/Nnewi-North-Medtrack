@@ -18,7 +18,7 @@
  *
  *   DATABASE_URL="<pooled>" \
  *   BOOTSTRAP_ADMIN_USERNAME="your.name" \
- *   BOOTSTRAP_ADMIN_PIN="<8 to 12 digits>" \
+ *   BOOTSTRAP_ADMIN_PIN="<8 to 12 characters>" \
  *     pnpm db:bootstrap-admin
  *
  * The PIN comes from the environment rather than an argument, because an
@@ -27,17 +27,12 @@
  */
 import { PrismaClient } from "@prisma/client";
 import * as argon2 from "argon2";
+import { BREAK_GLASS_PIN_MAX, BREAK_GLASS_PIN_MIN, breakGlassPinSchema } from "@phc/shared";
 
 const prisma = new PrismaClient();
 
-/**
- * The login schema accepts 4 to 12 characters, so this account has to sit in
- * that range. The floor is raised to 8 here: this is the one account that can
- * reach every facility in the LGA, and a 4-digit PIN is 10,000 guesses. Rate
- * limiting slows that down; it does not make it acceptable.
- */
-const MIN_PIN = 8;
-const MAX_PIN = 12;
+// Bounds and the rule itself live in packages/shared/src/pin.ts, so this
+// script, the admin screen and the login endpoint cannot drift apart again.
 
 async function main() {
   const username = (process.env.BOOTSTRAP_ADMIN_USERNAME ?? "").trim();
@@ -46,10 +41,12 @@ async function main() {
   if (!username) {
     throw new Error("BOOTSTRAP_ADMIN_USERNAME is required.");
   }
-  if (pin.length < MIN_PIN || pin.length > MAX_PIN) {
+  const checked = breakGlassPinSchema.safeParse(pin);
+  if (!checked.success) {
     throw new Error(
-      `BOOTSTRAP_ADMIN_PIN must be ${MIN_PIN} to ${MAX_PIN} characters. ` +
-        "This account can reach every facility, so it does not get a 4-digit PIN.",
+      `BOOTSTRAP_ADMIN_PIN: ${checked.error.issues.map((i) => i.message).join(" ")}\n` +
+        `This account reaches every facility in the LGA, so it needs ` +
+        `${BREAK_GLASS_PIN_MIN} to ${BREAK_GLASS_PIN_MAX} characters, not a clinic PIN.`,
     );
   }
 

@@ -10,7 +10,7 @@
  * provisioned; the actions are simply unavailable.
  */
 import { useCallback, useEffect, useState } from "react";
-import { ROLES, ROLE_LABELS, type Role } from "@phc/shared";
+import { ROLES, ROLE_LABELS, STAFF_PIN_HINT, describeStaffPinProblem, type Role } from "@phc/shared";
 import { Badge, Modal } from "./ui";
 import { useSession } from "../lib/session";
 import { useSync } from "../lib/sync";
@@ -75,8 +75,18 @@ export function StaffAdmin() {
     }
   }
 
+  // Only once something has been typed: an empty field the user has not reached
+  // yet is not a mistake, and marking it red before they start is noise.
+  const pinProblem = form.pin.length > 0 ? describeStaffPinProblem(form.pin) : null;
+
   async function submitNew() {
     if (!facilityId) return;
+    // Caught here so the message is immediate and no request is made. The hub
+    // enforces the same rule regardless; this is feedback, not security.
+    if (pinProblem) {
+      setError(pinProblem);
+      return;
+    }
     const ok = await act("create", () =>
       createStaff({
         full_name: form.full_name.trim(),
@@ -183,15 +193,26 @@ export function StaffAdmin() {
             />
           </label>
           <label className="block">
-            <span className="label">Starting PIN (4 to 6 digits)</span>
+            <span className="label">Starting PIN ({STAFF_PIN_HINT})</span>
             <input
               className="input tracking-[0.3em]"
               inputMode="numeric"
               value={form.pin}
               onChange={(e) => setForm({ ...form, pin: e.target.value })}
+              aria-invalid={pinProblem !== null}
+              aria-describedby="pin-help"
             />
-            <span className="mt-1 block text-xs text-slate-500">
-              They should change it after their first sign-in. Obvious PINs are refused.
+            {/*
+              Said as the field is filled in, not after a failed round trip. The
+              same function produces the hub's message, so the two cannot
+              disagree and nobody is corrected twice for one mistake.
+            */}
+            <span
+              id="pin-help"
+              className={`mt-1 block text-xs ${pinProblem ? "text-red-600" : "text-slate-500"}`}
+            >
+              {pinProblem ??
+                "They should change it after their first sign-in. Obvious PINs are refused."}
             </span>
           </label>
           <label className="block">

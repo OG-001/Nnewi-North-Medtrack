@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { loginPinSchema } from "@phc/shared";
 
 export const loginSchema = z.object({
   username: z.string().min(1),
-  pin: z.string().min(4).max(12),
+  // Input bound only, never policy: see packages/shared/src/pin.ts.
+  pin: loginPinSchema,
   facility_id: z.string().min(1),
   device_id: z.string().min(1).optional(),
 });

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PHC-Track — Show of Hands 3.0</title>
+<style>
+  :root{
+    --brand:#14532d; --brand-light:#166534; --ink:#0f172a;
+    --paper:#f8fafc; --muted:#64748b; --accent:#fbbf24;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#000;overflow:hidden;
+    font-family:"Segoe UI",Roboto,system-ui,sans-serif}
+  /* Fixed 1280x720 so the recording is exactly 16:9 at a modest file size. */
+  #stage{position:relative;width:1280px;height:720px;background:var(--brand);
+    overflow:hidden}
+  .slide{position:absolute;inset:0;opacity:0;transition:opacity .6s ease;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:64px;text-align:center}
+  .slide.on{opacity:1}
+
+  .kicker{font-size:20px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--accent);font-weight:600;margin-bottom:28px}
+  h1{font-size:76px;line-height:1.04;color:#fff;font-weight:700;letter-spacing:-.02em}
+  h2{font-size:52px;line-height:1.14;color:#fff;font-weight:600;max-width:17ch}
+  .sub{margin-top:26px;font-size:28px;color:#bbf7d0;max-width:30ch;line-height:1.45}
+  .byline{margin-top:40px;font-size:22px;color:#86efac;line-height:1.6}
+
+  /* Screenshot slides: white ground so the app reads clearly. */
+  .shot{background:var(--paper);justify-content:flex-start;padding:0}
+  .shot .bar{width:100%;padding:22px 48px;background:var(--brand);
+    display:flex;align-items:baseline;gap:18px;flex:0 0 auto}
+  .shot .bar b{color:#fff;font-size:30px;font-weight:600}
+  .shot .bar span{color:#bbf7d0;font-size:20px}
+  .shot .frame{flex:1 1 auto;width:100%;display:flex;align-items:flex-start;
+    justify-content:center;padding:26px 48px 34px;min-height:0}
+  .shot img{max-width:100%;max-height:100%;object-fit:contain;object-position:top;
+    border:1px solid #cbd5e1;border-radius:10px;
+    box-shadow:0 18px 44px rgba(15,23,42,.22)}
+
+  /* Big-number slide. */
+  .stats{display:flex;gap:96px;margin-top:16px}
+  .stat b{display:block;font-size:104px;color:#fff;font-weight:700;line-height:1}
+  .stat span{display:block;margin-top:14px;font-size:22px;color:#bbf7d0;
+    letter-spacing:.04em}
+  .note{margin-top:52px;font-size:22px;color:#fde68a;max-width:40ch;line-height:1.5}
+
+  .tagline{font-size:46px;line-height:1.3;color:#fff;font-weight:500;max-width:24ch;
+    font-style:italic}
+  .tagline i{color:var(--accent);font-style:italic}
+
+  /* Progress hairline, so a viewer can see how far in they are. */
+  #bar{position:absolute;left:0;bottom:0;height:5px;width:0;
+    background:var(--accent);transition:width .25s linear;z-index:5}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="bar"></div>
+
+  <!-- 0:00 Title -->
+  <section class="slide" data-at="0">
+    <div class="kicker">National Health Fellows &middot; Show of Hands 3.0</div>
+    <h1>PHC-Track</h1>
+    <p class="sub">A health record built for how our primary health centres actually work</p>
+    <p class="byline">Ogechukwu Eleodimuo<br>National Health Fellow &middot; Nnewi North LGA, Anambra State</p>
+  </section>
+
+  <!-- 0:13 The problem -->
+  <section class="slide" data-at="13">
+    <div class="kicker">The problem</div>
+    <h2>A history that lives in one register, in one building</h2>
+    <p class="sub">When she travels, it does not follow her. Monthly returns are counted by hand, and arrive late.</p>
+  </section>
+
+  <!-- 0:26 Why not just put it online -->
+  <section class="slide" data-at="26">
+    <div class="kicker">And the obvious answer fails</div>
+    <h2>A nurse cannot ask a mother to wait for a signal</h2>
+    <p class="sub">The network is not dependable. Anything that needs it first does not survive a real clinic.</p>
+  </section>
+
+  <!-- 0:40 Offline first -->
+  <section class="slide shot" data-at="40">
+    <div class="bar"><b>Works with no network at all</b><span>Every record written on the device, immediately</span></div>
+    <div class="frame"><img src="video-stills/d-patients.png" alt="Registering a patient with the network disabled"></div>
+  </section>
+
+  <!-- 0:52 Saved offline -->
+  <section class="slide shot" data-at="52">
+    <div class="bar"><b>The clinic queue, in order</b><span>Who is waiting, and for what</span></div>
+    <div class="frame"><img src="video-stills/h-queue.png" alt="Record saved while offline and queued for sync"></div>
+  </section>
+
+  <!-- 1:03 Reconciles itself -->
+  <section class="slide shot" data-at="63">
+    <div class="bar"><b>One view of the facility</b><span>Reconciled with the hub on its own</span></div>
+    <div class="frame"><img src="video-stills/c-dashboard.png" alt="Device reconciled with the central sync hub"></div>
+  </section>
+
+  <!-- 1:13 Immunisation -->
+  <section class="slide shot" data-at="73">
+    <div class="bar"><b>The schedule follows the child</b><span>Not the register</span></div>
+    <div class="frame"><img src="video-stills/e-immunization.png" alt="Immunisation schedule tracking"></div>
+  </section>
+
+  <!-- 1:23 Reporting -->
+  <section class="slide shot" data-at="83">
+    <div class="bar"><b>Monthly returns, from the records themselves</b><span>In the shape the national system expects</span></div>
+    <div class="frame"><img src="video-stills/g-reports.png" alt="NHMIS monthly report with DHIS2 export"></div>
+  </section>
+
+  <!-- 1:30 Privacy -->
+  <section class="slide shot" data-at="90">
+    <div class="bar"><b>Antenatal care, tracked to term</b><span>Every access attributable, nothing clinical ever deleted</span></div>
+    <div class="frame"><img src="video-stills/f-maternal.png" alt="Audit trail of every access"></div>
+  </section>
+
+  <!-- 1:40 Reach -->
+  <section class="slide" data-at="100">
+    <div class="kicker">Reach</div>
+    <div class="stats">
+      <div class="stat"><b>76</b><span>PRIMARY HEALTH CENTRES</span></div>
+      <div class="stat"><b>220,000+</b><span>PEOPLE IN NNEWI NORTH</span></div>
+    </div>
+    <p class="note">Built and tested. Ready for a pilot, not yet in service.</p>
+  </section>
+
+  <!-- 1:52 The ask -->
+  <section class="slide" data-at="112">
+    <div class="kicker">The ask</div>
+    <h2>Prove it in a few centres. Let the evidence decide.</h2>
+    <p class="sub">Measure what changes, then scale on what the data shows.</p>
+  </section>
+
+  <!-- 2:02 Close -->
+  <section class="slide" data-at="122">
+    <p class="tagline">Care does not wait for the network;<br><i>the network catches up to care.</i></p>
+    <p class="byline">PHC-Track &middot; Nnewi North LGA &middot; Anambra State</p>
+  </section>
+</div>
+
+<script>
+  // Slide cues come from data-at, in seconds, matching the timings in
+  // docs/show-of-hands-voiceover.md. Change one and change the other.
+  const slides = [...document.querySelectorAll(".slide")];
+  const cues = slides.map(s => +s.dataset.at);
+  const RUNTIME = 134;                       // 2:14, the script's measured length
+  const bar = document.getElementById("bar");
+  const t0 = performance.now();
+
+  function frame(now) {
+    const t = (now - t0) / 1000;
+    let active = 0;
+    for (let i = 0; i < cues.length; i++) if (t >= cues[i]) active = i;
+    slides.forEach((s, i) => s.classList.toggle("on", i === active));
+    bar.style.width = Math.min(100, (t / RUNTIME) * 100) + "%";
+    // Signals the recorder that the run is over.
+    if (t >= RUNTIME + 1) { document.title = "DONE"; return; }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>

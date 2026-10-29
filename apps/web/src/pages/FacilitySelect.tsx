@@ -249,7 +249,7 @@ export function FacilitySelectPage() {
         </div>
 
         <p className="mt-4 text-center text-xs text-brand-100/60">
-          Works offline · {APP_CONFIG.complianceBaseline} · Data stays in {APP_CONFIG.country}
+          Works offline · Protected under the {APP_CONFIG.complianceBaseline}
         </p>
       </div>
     </div>

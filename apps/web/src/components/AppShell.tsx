@@ -82,8 +82,15 @@ export function AppShell() {
           );
         })}
       </nav>
+      {/*
+        States the governing law, never where the data is hosted. "Patient data
+        stays in Nigeria" used to sit here and became false when hosting moved.
+        A location claim in the UI goes stale with no code change and nobody
+        notices, which is why it is not made. See
+        .claude/rules/ndpa-compliance.md section 1.
+      */}
       <div className="border-t border-white/10 px-4 py-3 text-[11px] text-brand-100/60">
-        {APP_CONFIG.complianceBaseline} · Patient data stays in {APP_CONFIG.country}
+        Protected under the {APP_CONFIG.complianceBaseline}
       </div>
     </div>
   );

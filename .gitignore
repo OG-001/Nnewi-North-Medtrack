@@ -35,3 +35,10 @@ packages/shared/dist/
 # Build them when you need to hand the evidence over, do not commit them.
 docs/evidence/*.zip
 docs/evidence/**/*.zip
+
+# The Show of Hands video, ~7MB, regenerated from docs/show-of-hands-video.html.
+# Kept out of the repository for the same reason as the evidence archives: a
+# binary git cannot diff, in every clone forever, when the source that makes it
+# is three text files.
+docs/*.webm
+docs/*.mp4

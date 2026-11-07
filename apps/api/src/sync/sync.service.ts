@@ -13,6 +13,7 @@ import {
 } from "@phc/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { ApiError } from "../common/api-error";
+import { FacilityPermissionsService } from "../common/facility-permissions.service";
 import { inScope, type Principal } from "../common/principal";
 import { resolveChange, type Payload } from "./conflict";
 
@@ -26,6 +27,7 @@ import { resolveChange, type Payload } from "./conflict";
  */
 const BASELINE_WINDOW_DAYS: Record<string, number | null> = {
   patient: null, // the roster itself is what makes the device useful offline
+  medication: null, // active medication lists must be available offline
   patient_link: null,
   pregnancy: null, // active pregnancies are few and needed in full
   anc_schedule_item: 400, // roughly one pregnancy's worth of schedule
@@ -42,6 +44,7 @@ export const DEFAULT_BASELINE_WINDOW_DAYS = 365;
 /** Entity types a device holds locally; drives the baseline snapshot. */
 const BASELINE_TYPES = [
   "patient",
+  "medication",
   "patient_link",
   "encounter",
   "referral",
@@ -57,7 +60,10 @@ const BASELINE_TYPES = [
 export class SyncService {
   private readonly logger = new Logger("Sync");
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly permissions: FacilityPermissionsService,
+  ) {}
 
   // ---- Enrolment (offline-sync-design §7) ----
 
@@ -284,11 +290,54 @@ export class SyncService {
     if (!inScope(principal, facilityId)) {
       throw ApiError.outOfScope(`Facility ${facilityId} is outside your scope`);
     }
+    const isDelete = change.op === "delete";
+    if (entityType === "medication") {
+      await this.permissions.assertAtFacility(principal, "prescribe", facilityId);
+      for (const [field, maxLength] of [
+        ["patient_id", 128],
+        ["drug_name", 200],
+        ["dosage", 500],
+        ["time_to_take", 500],
+      ] as const) {
+        const value = payload[field];
+        if (typeof value !== "string" || !value.trim() || value.length > maxLength) {
+          throw ApiError.validation(`payload.${field} is required and must be at most ${maxLength} characters`);
+        }
+      }
+    }
 
     return this.prisma.$transaction(async (tx) => {
+      if (entityType === "medication") {
+        const patient = await tx.syncedEntity.findUnique({
+          where: {
+            entityType_id: {
+              entityType: "patient",
+              id: String(payload.patient_id),
+            },
+          },
+          select: { facilityId: true, deletedAt: true },
+        });
+        if (
+          !patient ||
+          patient.facilityId !== facilityId ||
+          (!isDelete && patient.deletedAt !== null)
+        ) {
+          throw ApiError.validation("Medication must reference an active patient at the same facility");
+        }
+      }
+
       const existing = await tx.syncedEntity.findUnique({
         where: { entityType_id: { entityType, id: entityId } },
       });
+      if (entityType === "medication" && existing) {
+        const existingPayload = existing.payload as Payload;
+        if (existing.facilityId !== facilityId) {
+          throw ApiError.outOfScope("Medication cannot be moved to a different facility");
+        }
+        if (String(existingPayload.patient_id) !== String(payload.patient_id)) {
+          throw ApiError.validation("Medication cannot be reassigned to a different patient");
+        }
+      }
 
       // The payload the client edited from, recovered from the ledger so that
       // field-level merge can tell a real edit from a stale echo.
@@ -327,10 +376,9 @@ export class SyncService {
         } satisfies PushResult;
       }
 
-      const isDelete = change.op === "delete";
       const nextRev = (existing?.rev ?? 0) + 1;
       const now = new Date();
-      const nextPayload = { ...resolution.payload, rev: nextRev };
+      const nextPayload: Payload = { ...resolution.payload, rev: nextRev };
       const needsReview = resolution.kind === "escalate";
 
       const seqRow = await tx.changeLog.create({
@@ -369,6 +417,41 @@ export class SyncService {
           serverSeq: seqRow.serverSeq,
         },
       });
+
+      if (entityType === "medication") {
+        const medication = {
+          patientId: String(nextPayload.patient_id),
+          facilityId,
+          drugName: String(nextPayload.drug_name),
+          dosage: String(nextPayload.dosage),
+          timeToTake: String(nextPayload.time_to_take),
+          updatedAt: now,
+          updatedBy: String(nextPayload.updated_by ?? principal.userId),
+          rev: nextRev,
+          deletedAt: isDelete ? now : null,
+          originDeviceId: deviceId,
+        };
+        await tx.medication.upsert({
+          where: { id: entityId },
+          create: {
+            id: entityId,
+            ...medication,
+            createdAt: payload.created_at ? new Date(String(payload.created_at)) : now,
+            createdBy: String(payload.created_by ?? principal.userId),
+          },
+          update: medication,
+        });
+        await tx.auditEvent.create({
+          data: {
+            actorUserId: principal.userId,
+            action: isDelete ? "medication_deleted" : "medication_recorded",
+            entityType: "medication",
+            entityId,
+            facilityId,
+            deviceId,
+          },
+        });
+      }
 
       // Every conflict resolution is audited (§5, closing line).
       if (resolution.kind === "merged" || resolution.kind === "escalate") {

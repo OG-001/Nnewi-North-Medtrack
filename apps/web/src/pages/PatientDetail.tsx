@@ -8,7 +8,7 @@ import { useSession } from "../lib/session";
 import { Badge, Field, Modal, PageHeader } from "../components/ui";
 import { IconAlert, IconArrowLeft, IconPlus, IconMaternal, IconSyringe } from "../components/icons";
 import { fullName, patientAge, formatDate, titleCase } from "../lib/format";
-import type { Encounter, Patient, QueueEntry } from "../db/types";
+import type { Encounter, Medication, Patient, QueueEntry } from "../db/types";
 import { StartPregnancyModal } from "../components/StartPregnancyModal";
 
 export function PatientDetailPage() {
@@ -17,6 +17,7 @@ export function PatientDetailPage() {
   const { can, actor } = useSession();
   const [showVisit, setShowVisit] = useState(false);
   const [showPregnancy, setShowPregnancy] = useState(false);
+  const [showMedication, setShowMedication] = useState(false);
 
   const patient = useLiveQuery(() => db.patients.get(id), [id]);
   const encounters = useLiveQuery(
@@ -27,6 +28,11 @@ export function PatientDetailPage() {
   const pregnancies = useLiveQuery(() => db.pregnancies.where("patient_id").equals(id).toArray(), [id], []);
   const doses = useLiveQuery(() => db.immunizationDoses.where("patient_id").equals(id).toArray(), [id], []);
   const referrals = useLiveQuery(() => db.referrals.where("patient_id").equals(id).toArray(), [id], []);
+  const medications = useLiveQuery(
+    () => db.medications.where("patient_id").equals(id).reverse().sortBy("created_at"),
+    [id],
+    [],
+  );
 
   const activePregnancy = pregnancies.find((p) => p.status === "active" && !p.deleted_at);
   const givenDoses = doses.filter((d) => d.status === "given").length;
@@ -78,6 +84,11 @@ export function PatientDetailPage() {
             {can("emr.write") && (
               <button className="btn-primary" onClick={() => setShowVisit(true)}>
                 <IconPlus width={16} height={16} /> Record visit
+              </button>
+            )}
+            {can("prescribe") && (
+              <button className="btn-secondary" onClick={() => setShowMedication(true)}>
+                <IconPlus width={16} height={16} /> Add medication
               </button>
             )}
           </div>
@@ -147,6 +158,39 @@ export function PatientDetailPage() {
             </div>
           </div>
 
+          <div className="card p-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-slate-700">Medications</h3>
+              {can("prescribe") && (
+                <button
+                  className="text-xs font-medium text-brand-700 hover:underline"
+                  onClick={() => setShowMedication(true)}
+                >
+                  Add
+                </button>
+              )}
+            </div>
+            {medications.filter((medication) => !medication.deleted_at).length === 0 ? (
+              <p className="text-sm text-slate-400">No medication records.</p>
+            ) : (
+              <ul className="space-y-3">
+                {medications
+                  .filter((medication) => !medication.deleted_at)
+                  .map((medication) => (
+                    <li key={medication.id} className="border-t border-slate-100 pt-2">
+                      <p className="text-sm font-medium text-slate-800">{medication.drug_name}</p>
+                      <p className="text-xs text-slate-600">
+                        {medication.dosage} · {medication.time_to_take}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        Recorded {formatDate(medication.created_at)}
+                      </p>
+                    </li>
+                  ))}
+              </ul>
+            )}
+          </div>
+
           {referrals.filter((r) => !r.deleted_at).length > 0 && (
             <div className="card p-4">
               <h3 className="mb-2 text-sm font-semibold text-slate-700">Referrals</h3>
@@ -186,6 +230,16 @@ export function PatientDetailPage() {
         patient={patient}
         onClose={() => setShowPregnancy(false)}
       />
+      <Modal
+        open={showMedication}
+        title={`Add medication — ${fullName(patient)}`}
+        onClose={() => setShowMedication(false)}
+      >
+        <AddMedicationForm
+          patient={patient}
+          onDone={() => setShowMedication(false)}
+        />
+      </Modal>
     </div>
   );
 }
@@ -357,5 +411,80 @@ function NumberInput({ ph, val, on }: { ph: string; val: string; on: (v: string)
       value={val}
       onChange={(e) => on(e.target.value)}
     />
+  );
+}
+
+function AddMedicationForm({ patient, onDone }: { patient: Patient; onDone: () => void }) {
+  const { actor } = useSession();
+  const [drugName, setDrugName] = useState("");
+  const [dosage, setDosage] = useState("");
+  const [timeToTake, setTimeToTake] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    if (!actor) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const medication = createRecord<Medication>(actor, {
+        patient_id: patient.id,
+        drug_name: drugName.trim(),
+        dosage: dosage.trim(),
+        time_to_take: timeToTake.trim(),
+      });
+      await saveRecord(db.medications, medication, actor, "create");
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save medication.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Field label="Medication name" required>
+        <input
+          className="input"
+          value={drugName}
+          maxLength={200}
+          onChange={(event) => setDrugName(event.target.value)}
+          required
+        />
+      </Field>
+      <Field label="Dosage" required>
+        <input
+          className="input"
+          value={dosage}
+          maxLength={500}
+          onChange={(event) => setDosage(event.target.value)}
+          required
+        />
+      </Field>
+      <Field label="Time to take" required>
+        <input
+          className="input"
+          value={timeToTake}
+          maxLength={500}
+          onChange={(event) => setTimeToTake(event.target.value)}
+          required
+        />
+      </Field>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <p className="text-xs text-slate-500">
+        Enter the medication instructions provided by the prescribing clinician.
+      </p>
+      <div className="flex justify-end gap-2">
+        <button className="btn-secondary" onClick={onDone}>Cancel</button>
+        <button
+          className="btn-primary"
+          onClick={save}
+          disabled={busy || !drugName.trim() || !dosage.trim() || !timeToTake.trim()}
+        >
+          {busy ? "Saving…" : "Save medication"}
+        </button>
+      </div>
+    </div>
   );
 }

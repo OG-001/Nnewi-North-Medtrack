@@ -28,6 +28,32 @@ pnpm preview        # serve the built PWA → http://localhost:4173
 docker compose -f infra/docker-compose.yml up --build   # PWA on http://localhost:8080
 ```
 
+### Run the API against the Neon production branch
+
+`neon deploy` pulls the linked branch's connection variables into the ignored
+root `.env.local`. To use Neon from the local Compose API, pass that file
+explicitly. This connects the API to the production database, so its reads and
+writes are real; do not use demo or test actions against patient records.
+
+```bash
+PHC_WEB_PORT=8082 PHC_DB_PORT=55432 PHC_REDIS_PORT=56379 PHC_API_PORT=3100 \
+  docker compose --env-file .env.local -f infra/docker-compose.yml up --build -d
+```
+
+Open http://localhost:8082. The API uses Neon; the local Postgres and Redis
+containers still start for the rest of the Compose stack. Without
+`--env-file .env.local`, Compose keeps using its local Postgres database. Only
+Neon's pooled URL is passed to the API container. The unpooled URL remains
+available in `.env.local` as `DATABASE_URL_UNPOOLED`; map it to
+`DIRECT_DATABASE_URL` when running Prisma migrations or backups. Do not pass it
+to the API container.
+
+Stop the stack with:
+
+```bash
+docker compose --env-file .env.local -f infra/docker-compose.yml down
+```
+
 ---
 
 ## First-run flow: selecting your PHC

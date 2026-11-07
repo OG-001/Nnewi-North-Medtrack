@@ -42,3 +42,4 @@ docs/evidence/**/*.zip
 # is three text files.
 docs/*.webm
 docs/*.mp4
+.neon

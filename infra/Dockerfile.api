@@ -3,6 +3,7 @@
 
 FROM node:20-alpine AS build
 WORKDIR /repo
+RUN apk add --no-cache openssl
 RUN corepack enable
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
@@ -18,6 +19,7 @@ RUN pnpm --filter @phc/shared build \
 
 FROM node:20-alpine AS runtime
 WORKDIR /repo
+RUN apk add --no-cache openssl
 RUN corepack enable
 ENV NODE_ENV=production
 
@@ -55,4 +57,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # Set RUN_MIGRATIONS_ON_START=true to restore the old behaviour. It is there for
 # a single-container local stack, where the race cannot happen. Never set it on
 # a multi-instance deployment.
-CMD ["sh", "-c", "cd apps/api &&   if [ "$RUN_MIGRATIONS_ON_START" = "true" ]; then npx prisma migrate deploy; fi &&   node dist/src/main.js"]
+CMD ["sh", "-c", "cd apps/api && if [ \"$RUN_MIGRATIONS_ON_START\" = \"true\" ]; then npx prisma migrate deploy; fi && node dist/src/main.js"]

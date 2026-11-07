@@ -27,6 +27,7 @@ export const ENTITY_CLASS_BY_TYPE = {
   patient: "demographics",
   patient_link: "structural",
   encounter: "append_only",
+  medication: "append_only",
   referral: "append_only",
   pregnancy: "workflow",
   anc_schedule_item: "workflow",

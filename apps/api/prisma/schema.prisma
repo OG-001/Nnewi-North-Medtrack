@@ -12,12 +12,12 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   // DATABASE_URL is the POOLED endpoint, used by the running hub. A managed
   // Postgres puts a connection pooler in front, which is what makes a hub that
   // wakes and sleeps affordable: each wake would otherwise open a fresh set of
   // server-side connections and exhaust the limit.
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
   // DIRECT_DATABASE_URL bypasses the pooler. Migrations need a session-level
   // connection: they take advisory locks and run statements a transaction-mode
   // pooler will not carry, so running them through the pooled endpoint fails in
@@ -30,22 +30,23 @@ datasource db {
 
 /// Facilities are hub-authoritative config (offline-sync-design §5).
 model Facility {
-  id            String   @id
-  code          String   @unique
-  name          String
-  nationalCode  String?  @map("national_code")
-  type          String
-  ward          String?
-  town          String?
-  lga           String
-  state         String
-  contactPhone  String?  @map("contact_phone")
-  active        Boolean  @default(true)
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id           String   @id
+  code         String   @unique
+  name         String
+  nationalCode String?  @map("national_code")
+  type         String
+  ward         String?
+  town         String?
+  lga          String
+  state        String
+  contactPhone String?  @map("contact_phone")
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  users    UserFacility[]
-  entities SyncedEntity[]
+  users       UserFacility[]
+  entities    SyncedEntity[]
+  medications Medication[]
 
   @@map("facility")
 }
@@ -90,13 +91,13 @@ model UserFacility {
 
 /// Enrolled clinic device (offline-sync-design §7). De-enrolment revokes sync.
 model Device {
-  id           String    @id
-  userId       String    @map("user_id")
-  label        String?
-  lastSeenAt   DateTime? @map("last_seen_at")
-  lastPushSeq  BigInt    @default(0) @map("last_push_seq")
-  revokedAt    DateTime? @map("revoked_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  id          String    @id
+  userId      String    @map("user_id")
+  label       String?
+  lastSeenAt  DateTime? @map("last_seen_at")
+  lastPushSeq BigInt    @default(0) @map("last_push_seq")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -122,18 +123,18 @@ model RefreshToken {
 
 /// The synced clinical row. `rev` is the conflict signal, never a device clock.
 model SyncedEntity {
-  entityType     String   @map("entity_type")
+  entityType     String    @map("entity_type")
   id             String
-  facilityId     String   @map("facility_id")
-  rev            Int      @default(1)
+  facilityId     String    @map("facility_id")
+  rev            Int       @default(1)
   payload        Json
-  createdAt      DateTime @map("created_at")
-  updatedAt      DateTime @map("updated_at")
+  createdAt      DateTime  @map("created_at")
+  updatedAt      DateTime  @map("updated_at")
   deletedAt      DateTime? @map("deleted_at")
-  originDeviceId String?  @map("origin_device_id")
+  originDeviceId String?   @map("origin_device_id")
   /// Set when an identity-critical contradiction escalated (§5 Escalation).
-  needsReview    Boolean  @default(false) @map("needs_review")
-  serverSeq      BigInt   @map("server_seq")
+  needsReview    Boolean   @default(false) @map("needs_review")
+  serverSeq      BigInt    @map("server_seq")
 
   facility Facility @relation(fields: [facilityId], references: [id])
 
@@ -141,6 +142,30 @@ model SyncedEntity {
   @@index([facilityId, entityType])
   @@index([serverSeq])
   @@map("synced_entity")
+}
+
+/// Relational projection of synced medication records for querying and reporting.
+/// `synced_entity` remains the sync authority; patient rows are JSONB entities,
+/// so patientId is indexed but cannot have a relational FK.
+model Medication {
+  id             String    @id
+  patientId      String    @map("patient_id")
+  facilityId     String    @map("facility_id")
+  drugName       String    @map("drug_name")
+  dosage         String
+  timeToTake     String    @map("time_to_take")
+  createdAt      DateTime  @map("created_at")
+  createdBy      String    @map("created_by")
+  updatedAt      DateTime  @map("updated_at")
+  updatedBy      String    @map("updated_by")
+  rev            Int       @default(1)
+  deletedAt      DateTime? @map("deleted_at")
+  originDeviceId String    @map("origin_device_id")
+
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+
+  @@index([facilityId, patientId, createdAt])
+  @@map("medications")
 }
 
 /// Server-side sync ledger (data-model §3.10). Clients pull by `server_seq`.
@@ -182,15 +207,15 @@ model ConflictQueue {
 /// Immutable audit trail (security-and-compliance). Every conflict resolution,
 /// login and sync mutation writes one.
 model AuditEvent {
-  id         String   @id @default(uuid()) @db.Uuid
-  actorUserId String? @map("actor_user_id")
-  action     String
-  entityType String?  @map("entity_type")
-  entityId   String?  @map("entity_id")
-  facilityId String?  @map("facility_id")
-  deviceId   String?  @map("device_id")
-  details    Json?
-  at         DateTime @default(now())
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String?  @map("actor_user_id")
+  action      String
+  entityType  String?  @map("entity_type")
+  entityId    String?  @map("entity_id")
+  facilityId  String?  @map("facility_id")
+  deviceId    String?  @map("device_id")
+  details     Json?
+  at          DateTime @default(now())
 
   @@index([at])
   @@index([entityType, entityId])
@@ -267,14 +292,14 @@ model MonthlyReport {
 /// A correction to a locked report. The locked figures are never overwritten;
 /// the adjustment is the audit trail of what changed and why.
 model ReportAdjustment {
-  id         String   @id @default(uuid()) @db.Uuid
-  reportId   String   @map("report_id") @db.Uuid
-  figureKey  String   @map("figure_key")
-  fromValue  Int      @map("from_value")
-  toValue    Int      @map("to_value")
-  reason     String
-  createdBy  String   @map("created_by")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id        String   @id @default(uuid()) @db.Uuid
+  reportId  String   @map("report_id") @db.Uuid
+  figureKey String   @map("figure_key")
+  fromValue Int      @map("from_value")
+  toValue   Int      @map("to_value")
+  reason    String
+  createdBy String   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
 
   report MonthlyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
 

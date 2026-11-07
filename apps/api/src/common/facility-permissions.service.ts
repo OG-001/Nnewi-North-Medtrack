@@ -49,6 +49,24 @@ export class FacilityPermissionsService {
       }
     }
   }
+
+  async assertAtFacility(
+    principal: Principal,
+    permission: Permission,
+    facilityId: string,
+  ): Promise<void> {
+    if (principal.facilityScope !== null && !principal.facilityScope.includes(facilityId)) {
+      throw ApiError.outOfScope();
+    }
+
+    const config = await this.load();
+    const withdrawn = withdrawnPermissions(config, facilityId, principal.roles);
+    if (!can(principal.roles, permission, withdrawn)) {
+      throw ApiError.forbidden(
+        `"${permission}" has been switched off for your role at this facility`,
+      );
+    }
+  }
 }
 
 @Global()

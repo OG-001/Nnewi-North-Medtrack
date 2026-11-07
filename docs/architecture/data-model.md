@@ -150,6 +150,13 @@ delivery), guardians, etc.
 `prescription`: `encounter_id`, `drug` (free text + optional structured),
 `dose`, `frequency`, `duration`, `notes`.
 
+`medications`: offline-synced medication records keyed by `id`, linked to
+`patient_id` and `facility_id`, with `drug_name`, `dosage`, and `time_to_take`.
+The hub's `synced_entity`/`change_log` remain authoritative for synchronization;
+the relational table is a projection for querying. Patient rows are JSONB sync
+entities, so the patient link is validated by the sync service rather than a
+database foreign key. Creating a medication requires the `prescribe` permission.
+
 `allergy` / `chronic_condition` (patient-level flags shown on summary):
 `patient_id`, `label`, `severity?`, `noted_at`, `noted_by`.
 

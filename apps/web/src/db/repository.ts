@@ -52,6 +52,7 @@ export const ENTITY_TYPE_BY_TABLE: Record<string, string> = {
   patients: "patient",
   patientLinks: "patient_link",
   encounters: "encounter",
+  medications: "medication",
   referrals: "referral",
   pregnancies: "pregnancy",
   ancScheduleItems: "anc_schedule_item",

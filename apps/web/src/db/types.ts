@@ -121,6 +121,13 @@ export interface Encounter extends BaseRecord {
   queue_entry_id?: string;
 }
 
+export interface Medication extends BaseRecord {
+  patient_id: string;
+  drug_name: string;
+  dosage: string;
+  time_to_take: string;
+}
+
 export interface Referral extends BaseRecord {
   patient_id: string;
   encounter_id?: string;

@@ -13,6 +13,7 @@ import type {
   Facility,
   ImmunizationDose,
   MonthlyReport,
+  Medication,
   OutboxEntry,
   Patient,
   PatientLink,
@@ -30,6 +31,7 @@ export class PhcDatabase extends Dexie {
   patients!: Table<Patient, string>;
   patientLinks!: Table<PatientLink, string>;
   encounters!: Table<Encounter, string>;
+  medications!: Table<Medication, string>;
   referrals!: Table<Referral, string>;
   pregnancies!: Table<Pregnancy, string>;
   ancScheduleItems!: Table<AncScheduleItem, string>;
@@ -45,7 +47,7 @@ export class PhcDatabase extends Dexie {
 
   constructor() {
     super("phc-track");
-    this.version(1).stores({
+    const versionOneStores = {
       facilities: "id, code, active",
       users: "id, username, status",
       patients:
@@ -67,6 +69,11 @@ export class PhcDatabase extends Dexie {
       auditEvents: "id, actor_user_id, entity_id, at",
       outbox: "++localSeq, entity_id, status",
       syncMeta: "key",
+    };
+    this.version(1).stores(versionOneStores);
+    this.version(2).stores({
+      ...versionOneStores,
+      medications: "id, patient_id, facility_id, created_at, [patient_id+created_at]",
     });
   }
 }
